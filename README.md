@@ -5,3 +5,4 @@
 - [規則規格書](docs/spec.md)
 - [卡片規則檢查](docs/card-review.md)
 - [卡片文字修改清單](docs/card-changes.md)
+- [線上版功能規格](docs/digital-spec.md)
