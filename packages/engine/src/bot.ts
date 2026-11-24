@@ -108,6 +108,14 @@ function botDecision(state: GameState, lib: CardLibrary): Action {
     const cheapest = [...pending.items].sort((a, b) => sellPrice(state, lib, who, a) - sellPrice(state, lib, who, b))[0]!;
     return { type: "decide", decision: { option: "discard", target: cheapest } };
   }
+  if (pending.kind === "chooseWorkshop") return { type: "decide", decision: { option: "workshop", names: pending.options.slice(0, pending.count) } };
+  if (pending.kind === "resetAdventurers") return { type: "decide", decision: { option: "reset", targets: pending.candidates.slice(0, pending.count) } };
+  if (pending.kind === "extendTask") return { type: "decide", decision: { option: "task", target: pending.candidates[0]! } };
+  if (pending.kind === "confirmReplace") return { type: "decide", decision: { option: pending.what === "adventurer" ? "yes" : "no" } };
+  if (pending.kind === "destroyOwn") {
+    const pick = [...pending.candidates].sort((a, b) => Number(!!state.adventurerCards[b]!.derivative) - Number(!!state.adventurerCards[a]!.derivative) || value(state, lib, a) - value(state, lib, b))[0]!;
+    return { type: "decide", decision: { option: "destroy", target: pick } };
+  }
   if (pending.kind === "givePlayer") {
     const target = state.players.filter((x) => x.id !== who.id).sort((a, b) => b.reputation - a.reputation)[0]!;
     return { type: "decide", decision: { option: "player", target: target.id } };
@@ -184,6 +192,13 @@ export function botAction(state: GameState, lib: CardLibrary): Action {
     }
     case "adventure": {
       if (state.mission) return missionStep(state, lib);
+      // 瑪絲珂：先從工作室創造小嗶，再派遣
+      for (const uid of p.adventurers) {
+        const card = state.adventurerCards[uid]!;
+        if (!card.tapped && card.workshop?.length && activatedSkills(state, lib, uid).has("【小嗶！出動！】")) {
+          return { type: "activate", card: uid, skill: "【小嗶！出動！】", derivative: card.workshop[0]! };
+        }
+      }
       const tasks = [
         ...p.formal.filter((f) => f.timer !== null).sort((a, b) => a.timer! - b.timer!).map((f) => f.uid),
         ...p.staging,

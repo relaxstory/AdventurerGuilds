@@ -17,8 +17,11 @@ interface Ctx {
 const completedDefs = (ctx: Ctx, p: PlayerState): TaskDef[] =>
   p.completed.map((uid) => ctx.lib.task(ctx.state.taskCards[uid]!.defKey));
 
+/** 冒險者（不含衍生物，docs/honor-cards.md 通用規則 #3）。 */
+const units = (ctx: Ctx, p: PlayerState) => p.adventurers.filter((uid) => !ctx.state.adventurerCards[uid]!.derivative);
+
 const faces = (ctx: Ctx, p: PlayerState) =>
-  p.adventurers.map((uid) => {
+  units(ctx, p).map((uid) => {
     const c = ctx.state.adventurerCards[uid]!;
     return ctx.lib.adventurer(c.face === "back" ? `${c.defId}B` : c.defId);
   });
@@ -49,10 +52,10 @@ export const HONOR_RULES: Record<string, Evaluator> = {
   H14: (ctx, p) => count(completedDefs(ctx, p), (t) => (t.reputation ?? 0) === 0), // 只為報酬
   H15: (ctx, p) => new Set(completedDefs(ctx, p).flatMap((t) => t.tags)).size, // 見多識廣
   H16: (ctx, p) => faces(ctx, p).length, // 人才濟濟（衍生物不計入，M3）
-  H17: (ctx, p) => p.adventurers.reduce((s, uid) => s + unitBaseDice(ctx.state, ctx.lib, uid), 0), // 兵強馬壯（小隊為全隊加總）
+  H17: (ctx, p) => units(ctx, p).reduce((s, uid) => s + unitBaseDice(ctx.state, ctx.lib, uid), 0), // 兵強馬壯（小隊為全隊加總）
   H18: (ctx, p) => maxGroup(faces(ctx, p).map((a) => stripB(a.profession))), // 術業專攻
   H19: (ctx, p) => new Set(faces(ctx, p).map((a) => stripB(a.profession)).filter(Boolean)).size, // 百工百業
-  H20: (ctx, p) => new Set(p.adventurers.map((uid) => raceOf(ctx.state, ctx.lib, uid)).filter(Boolean)).size, // 多元共榮（菲特視為人類）
+  H20: (ctx, p) => new Set(units(ctx, p).map((uid) => raceOf(ctx.state, ctx.lib, uid)).filter(Boolean)).size, // 多元共榮（菲特視為人類）
   H21: (ctx, p) => count(faces(ctx, p), (a) => a.traits.includes("[王國]")), // 王國棟樑
 };
 

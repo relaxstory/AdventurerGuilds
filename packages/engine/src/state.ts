@@ -30,6 +30,10 @@ export interface AdventurerCard {
   tokens: Record<string, number>;
   /** 本輪已經用過「每輪第一次派遣不橫置」的輪次。 */
   freeDispatchRound?: number;
+  /** 衍生物（不佔容量，被銷毀時回到衍生物牌組）。 */
+  derivative?: boolean;
+  /** 瑪絲珂的工作室：可以創造的衍生物名稱。 */
+  workshop?: string[];
   /** 新兵小隊：這張卡是隊長時，底下的成員（由上到下，不含隊長）。 */
   squad?: string[];
   /** 本輪的基礎骰數修正（藥劑、紅斑菌菇）。 */
@@ -130,7 +134,25 @@ export type Pending =
   /** 選擇要獲得的道具；optional 為 true 時可以不拿。 */
   | { readonly kind: "chooseItem"; readonly player: string; readonly options: readonly string[]; readonly optional: boolean; readonly source: string }
   /** 選擇一名其他玩家，把道具放在他面前（梅里妲的注視）。 */
-  | { readonly kind: "givePlayer"; readonly player: string; readonly item: string; readonly source: string };
+  | { readonly kind: "givePlayer"; readonly player: string; readonly item: string; readonly source: string }
+  /** 瑪絲珂【工作室】：從 options 中選 count 張不同名稱的衍生物。 */
+  | { readonly kind: "chooseWorkshop"; readonly player: string; readonly source: string; readonly options: readonly string[]; readonly count: number }
+  /** 重置至多 count 名冒險者（汐的和弦、小丑小嗶）；可以少選或不選。 */
+  | { readonly kind: "resetAdventurers"; readonly player: string; readonly source: string; readonly count: number; readonly candidates: readonly string[] }
+  /** 蕾的和弦：選擇一個任務時限 +amount；可以不選。 */
+  | { readonly kind: "extendTask"; readonly player: string; readonly source: string; readonly amount: number; readonly candidates: readonly string[] }
+  /** 梅里妲的注視：銷毀自己公會中的一名冒險者。 */
+  | { readonly kind: "destroyOwn"; readonly player: string; readonly source: string; readonly candidates: readonly string[] }
+  /** 是否使用「你可以改為銷毀……」的替代效果。 */
+  | {
+      readonly kind: "confirmReplace";
+      readonly player: string;
+      readonly what: "adventurer" | "item";
+      /** 原本要被銷毀的冒險者或道具。 */
+      readonly target: string;
+      /** 改為銷毀的冒險者（瓦雷諾）或道具（戈拉古斯的手稿）。 */
+      readonly replacement: string;
+    };
 
 export interface LogEntry {
   readonly round: number;
@@ -179,6 +201,10 @@ export interface GameState {
   itemCards: Record<string, ItemCard>;
   /** 道具編號的流水號。 */
   itemSeq: number;
+  /** 衍生物編號的流水號。 */
+  derivativeSeq: number;
+  /** 被銷毀（移出遊戲）的冒險者。 */
+  destroyed: string[];
   /** 已經出現過的【獨特】道具（整場遊戲只有一份，銷毀後也不會再出現）。 */
   uniquesCreated: string[];
   /** 回合開始的時機：回合開始後、做任何其他操作之前（凱菲【我先睡一下……】）。 */

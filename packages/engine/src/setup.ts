@@ -125,6 +125,8 @@ export function createGame(config: GameConfig, source: CardSource): GameState {
     pendingQueue: [],
     itemCards: {},
     itemSeq: 0,
+    derivativeSeq: 0,
+    destroyed: [],
     uniquesCreated: [],
     turnStartOpen: true,
     mission: null,

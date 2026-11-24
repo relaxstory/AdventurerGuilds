@@ -6,7 +6,8 @@ import { RULES } from "./constants.js";
 import type { CardLibrary, ClauseDef } from "./defs.js";
 import { RuleError } from "./errors.js";
 import type { Rng } from "./rng.js";
-import { consumeCategory, countCategory, discardItem, gainItem, splitList } from "./items.js";
+import { consumeCategory, countCategory, discardItem, gainItem, removeItem, splitList } from "./items.js";
+import { createDerivative, destroyAdventurer, destroyItem, finalizeDestroy } from "./lifecycle.js";
 import type { GameState, PlayerState } from "./state.js";
 
 /** 發動主動能力時提供的參數，依效果而定。 */
@@ -27,6 +28,8 @@ export interface ActivateParams {
   readonly count?: number;
   /** 要獲得的道具名稱（伊蓮娜）。 */
   readonly item?: string;
+  /** 要從工作室創造的衍生物（瑪絲珂）。 */
+  readonly derivative?: string;
 }
 
 export type Decision =
@@ -40,7 +43,18 @@ export type Decision =
   /** 不拿（選擇性的效果）。 */
   | { readonly option: "skip" }
   /** 選擇一名玩家。 */
-  | { readonly option: "player"; readonly target: string };
+  | { readonly option: "player"; readonly target: string }
+  /** 瑪絲珂【工作室】：選擇的衍生物名稱。 */
+  | { readonly option: "workshop"; readonly names: readonly string[] }
+  /** 選擇要重置的冒險者（可以少選或不選）。 */
+  | { readonly option: "reset"; readonly targets: readonly string[] }
+  /** 選擇一個任務。 */
+  | { readonly option: "task"; readonly target: string }
+  /** 選擇要銷毀的冒險者。 */
+  | { readonly option: "destroy"; readonly target: string }
+  /** 是否使用替代效果。 */
+  | { readonly option: "yes" }
+  | { readonly option: "no" };
 
 type Log = (text: string) => void;
 
@@ -48,6 +62,7 @@ const EFFECTS = new Set([
   "EFF_GAIN", "EFF_RESET", "EFF_FLIP_SELF", "EFF_RETRIEVE_TASK", "EFF_DISCARD_RECRUIT", "EFF_OPPONENT_TAP_OR_PAY",
   "EFF_OPPONENT_TAP_OR_FLIP", "EFF_TAP_WITH_TRAIT", "EFF_ADD_TOKENS_SELF", "EFF_REMOVE_TOKENS_SELF", "ADD_PARTICIPANT",
   "EFF_GAIN_ITEM_CHOICE", "EFF_CONVERT_ITEMS", "EFF_CREATE_ITEM_MOVE_TOKENS",
+  "EFF_CREATE_FROM_WORKSHOP", "EFF_TAP_BASE_DICE_BELOW", "EFF_TRANSFER_TOKENS_DESTROY",
 ]);
 
 /** 冒險者的主動能力：有 COST 子句的技能。回傳技能名稱 → 子句。 */
@@ -234,6 +249,55 @@ export function activate(state: GameState, lib: CardLibrary, rng: Rng, p: Player
           if (moved) log(`${moved} 個${c.y}指示物轉移到【${c.x}】`);
         });
         break;
+      case "EFF_CREATE_FROM_WORKSHOP": {
+        const workshop = state.adventurerCards[a.card]!.workshop ?? [];
+        if (!a.derivative || !workshop.includes(a.derivative)) throw new RuleError(`${label}：請從工作室選擇 ${workshop.join("、") || "（工作室是空的）"}`);
+        const id = lib.derivatives.get(a.derivative);
+        const transfer = id ? lib.clauses(lib.adventurer(id)).find((x) => x.code === "ON_CREATE_TRANSFER_TOKENS") : undefined;
+        const available = transfer ? state.adventurerCards[a.card]!.tokens[transfer.y] ?? 0 : 0;
+        const moving = a.count ?? available;
+        if (!Number.isInteger(moving) || moving < 0 || moving > available) throw new RuleError(`${label}：可以轉移 0～${available} 個指示物`);
+        plan.push(() => {
+          state.adventurerCards[a.card]!.workshop = workshop.filter((n, i) => i !== workshop.indexOf(a.derivative!));
+          const tokens: Record<string, number> = {};
+          if (transfer && moving) {
+            const src = state.adventurerCards[a.card]!;
+            src.tokens[transfer.y] = available - moving;
+            if (!src.tokens[transfer.y]) delete src.tokens[transfer.y];
+            tokens[transfer.y] = moving;
+          }
+          createDerivative(state, lib, p, a.derivative!, log, tokens);
+          if (moving) log(`轉移 ${moving} 個${transfer!.y}指示物`);
+        });
+        break;
+      }
+      case "EFF_TAP_BASE_DICE_BELOW": {
+        const limit = ab.amount(state, lib, a.card, c.x);
+        const targets = sameTargets(a.targets, max, label);
+        for (const t of targets) {
+          const f = ab.faceOf(state, lib, t);
+          if (ab.unitBaseDice(state, lib, t) >= limit) throw new RuleError(`${label}：${f.name} 的基礎骰數不低於 ${limit}`);
+          if (!ab.canTarget(state, lib, a.card, p.id, t)) throw new RuleError(`${label}：不能指定 ${f.name}`);
+        }
+        plan.push(() => {
+          for (const t of targets) state.adventurerCards[t]!.tapped = true;
+          log(`${label}：橫置 ${targets.map((t) => ab.faceOf(state, lib, t).name).join("、")}`);
+        });
+        break;
+      }
+      case "EFF_TRANSFER_TOKENS_DESTROY": {
+        const [t] = sameTargets(a.targets, 1, label);
+        if (t === a.card || ab.raceOf(state, lib, t!) !== c.y.replace(/[\[\]]/g, "")) throw new RuleError(`${label}：請指定另一名 [${c.y}] 冒險者`);
+        if (!ab.canTarget(state, lib, a.card, p.id, t!)) throw new RuleError(`${label}：不能指定 ${ab.faceOf(state, lib, t!).name}`);
+        plan.push(() => {
+          const src = state.adventurerCards[a.card]!;
+          const n = src.tokens[c.x] ?? 0;
+          delete src.tokens[c.x];
+          if (n) ab.addTokens(state, lib, t!, c.x, n, log, rng);
+          destroyAdventurer(state, lib, a.card, log, false);
+        });
+        break;
+      }
       case "ADD_PARTICIPANT": {
         const m = state.mission!;
         const targets = sameTargets(a.targets, ab.amount(state, lib, a.card, c.x) + max - 1, label);
@@ -323,6 +387,51 @@ function resolveDecision(
       }
       if (d.option !== "item" || !pending.options.includes(d.name)) throw new RuleError(`請選擇 ${pending.options.join("、")} 其中一種`);
       gainItem(state, lib, who, d.name, say);
+      break;
+    }
+    case "chooseWorkshop": {
+      const names = d.option === "workshop" ? d.names : [];
+      if (names.length !== pending.count || new Set(names).size !== names.length || names.some((n) => !pending.options.includes(n))) {
+        throw new RuleError(`請從 ${pending.options.join("、")} 中選擇 ${pending.count} 張不同名稱的衍生物`);
+      }
+      state.adventurerCards[pending.source]!.workshop = [...names];
+      say(`工作室：${names.join("、")}`);
+      break;
+    }
+    case "resetAdventurers": {
+      const targets = d.option === "reset" ? d.targets : d.option === "skip" ? [] : null;
+      if (!targets || targets.length > pending.count || targets.some((t) => !pending.candidates.includes(t))) {
+        throw new RuleError(`請從橫置的冒險者中選擇至多 ${pending.count} 名重置`);
+      }
+      for (const t of targets) state.adventurerCards[t]!.tapped = false;
+      say(targets.length ? `重置 ${targets.map((t) => ab.faceOf(state, lib, t).name).join("、")}` : "不重置");
+      break;
+    }
+    case "extendTask": {
+      if (d.option === "skip") break;
+      if (d.option !== "task" || !pending.candidates.includes(d.target)) throw new RuleError("請選擇正式任務區中有時限的任務");
+      const f = who.formal.find((x) => x.uid === d.target)!;
+      f.timer = (f.timer ?? 0) + pending.amount;
+      say(`「${lib.task(state.taskCards[d.target]!.defKey).name}」時限 +${pending.amount}`);
+      break;
+    }
+    case "destroyOwn": {
+      if (d.option !== "destroy" || !pending.candidates.includes(d.target)) throw new RuleError("請選擇自己公會中的一名冒險者");
+      destroyAdventurer(state, lib, d.target, say);
+      if (state.itemCards[pending.source]) destroyItem(state, lib, who, pending.source, say);
+      break;
+    }
+    case "confirmReplace": {
+      if (d.option !== "yes" && d.option !== "no") throw new RuleError("請選擇是否使用替代效果");
+      const use = d.option === "yes";
+      if (pending.what === "adventurer") {
+        if (use) say(`${ab.faceOf(state, lib, pending.replacement).name} 改為被銷毀`);
+        finalizeDestroy(state, lib, use ? pending.replacement : pending.target, say);
+      } else {
+        const name = state.itemCards[use ? pending.replacement : pending.target]!.name;
+        removeItem(state, who, use ? pending.replacement : pending.target);
+        say(use ? `改為銷毀【${name}】` : `【${name}】被銷毀`);
+      }
       break;
     }
     case "givePlayer": {

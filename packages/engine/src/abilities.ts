@@ -9,6 +9,7 @@ import { turnOptions } from "./dice.js";
 import { RuleError } from "./errors.js";
 import type { Rng } from "./rng.js";
 import { countCategory, consumeCategory, gainItem, splitList } from "./items.js";
+import { workshopOptions } from "./lifecycle.js";
 import type { GameState, Mission, Pending, PlayerState } from "./state.js";
 
 /** 已實作的技能模板。其餘模板在對應的開發批次完成（docs/development.md）。 */
@@ -37,6 +38,11 @@ export const IMPLEMENTED = new Set([
   "EFF_CONVERT_ITEMS", "EFF_CREATE_ITEM_MOVE_TOKENS", "AFTER_ROLL_AUTO_SUCCESS",
   // M3-4b：新兵小隊
   "SQUAD", "SQUAD_DICE", "SQUAD_SALARY", "SQUAD_COMPLETE_GAIN", "SQUAD_RESULT_ADJUST", "SQUAD_DIFFICULTY",
+  // M3-4c：衍生物與銷毀
+  "ON_RECRUIT_WORKSHOP", "EFF_CREATE_FROM_WORKSHOP", "ON_CREATE_TRANSFER_TOKENS", "ROUNDEND_DESTROY_SELF",
+  "EFF_TAP_BASE_DICE_BELOW", "EFF_TRANSFER_TOKENS_DESTROY", "SETTLE_RESET", "WITH_CARD_DESTROY_AFTER",
+  "TURNSTART_CREATE_TOKEN", "TURNSTART_TASK_TIME", "ON_DESTROY_GAIN", "REPLACE_DESTROY_ALLY",
+  "REPLACE_DESTROY_UNIQUE_ITEM", "ON_REP_DECREASE_DESTROY",
 ]);
 
 // ── 新兵小隊（docs/spec.md 12）──
@@ -173,7 +179,7 @@ export function gain(p: PlayerState, value: number, resource: string, log: Log, 
 
 /** 佔用冒險者容量的人數（docs/spec.md 3.2）。 */
 export function capacityUsed(state: GameState, lib: CardLibrary, p: PlayerState): number {
-  return p.adventurers.filter((u) => !has(state, lib, u, "NOT_COUNT_CAPACITY")).length;
+  return p.adventurers.filter((u) => !state.adventurerCards[u]!.derivative && !has(state, lib, u, "NOT_COUNT_CAPACITY")).length;
 }
 
 export function canBeFired(state: GameState, lib: CardLibrary, uid: string): boolean {
@@ -191,6 +197,12 @@ export function onRecruit(state: GameState, lib: CardLibrary, p: PlayerState, ui
   const name = faceOf(state, lib, uid).name;
   for (const c of clauses(state, lib, uid, "ON_RECRUIT_GAIN")) gain(p, amount(state, lib, uid, c.x), c.y, log, name);
   for (const c of clauses(state, lib, uid, "ON_RECRUIT_GAIN_ITEM")) gainItem(state, lib, p, c.x, log);
+  for (const c of clauses(state, lib, uid, "ON_RECRUIT_WORKSHOP")) {
+    const options = workshopOptions(lib, c.x);
+    const count = amount(state, lib, uid, c.y);
+    if (options.length <= count) state.adventurerCards[uid]!.workshop = options;
+    else pushPending(state, { kind: "chooseWorkshop", player: p.id, source: uid, options, count });
+  }
   for (const c of clauses(state, lib, uid, "ON_RECRUIT_GIVE_ITEM")) {
     if (state.players.length > 1) pushPending(state, { kind: "givePlayer", player: p.id, item: c.x, source: uid });
   }

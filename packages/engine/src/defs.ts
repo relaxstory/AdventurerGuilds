@@ -70,6 +70,7 @@ export interface CardSource {
   readonly tasks: readonly TaskDef[];
   readonly honors: readonly HonorDef[];
   readonly items?: readonly ItemDef[];
+  readonly derivatives?: readonly AdventurerDef[];
   readonly clauses?: readonly ClauseRow[];
 }
 
@@ -78,6 +79,8 @@ export class CardLibrary {
   readonly adventurers = new Map<string, AdventurerDef>();
   readonly tasks = new Map<string, TaskDef>();
   readonly honors = new Map<string, HonorDef>();
+  /** 衍生物：名稱 → 卡片編號（衍生物的定義也放在 adventurers 中）。 */
+  readonly derivatives = new Map<string, string>();
   /** 道具：以名稱查詢（卡片文字以名稱引用道具）。 */
   readonly items = new Map<string, ItemDef>();
   readonly adventurerPool: string[] = [];
@@ -110,6 +113,11 @@ export class CardLibrary {
       (t.type === "史詩" ? this.epicPool : this.taskPool).push(key);
     }
     for (const i of source.items ?? []) if (usable(i.status)) this.items.set(i.name, i);
+    for (const d of source.derivatives ?? []) {
+      if (!usable(d.status)) continue;
+      this.adventurers.set(d.id, d);
+      this.derivatives.set(d.name, d.id);
+    }
     for (const h of source.honors) {
       this.honors.set(h.id, h);
       if (usable(h.status) && h.kind === "排名型") this.honorPool.push(h.id);

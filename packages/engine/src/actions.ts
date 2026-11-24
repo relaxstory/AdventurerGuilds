@@ -1,6 +1,7 @@
 import * as ab from "./abilities.js";
 import { activate, activatedSkills, decide, type ActivateParams, type Decision } from "./activate.js";
 import { sellItem, useItem, type UseItemParams } from "./items.js";
+import { afterSettle, checkReputationDrops, onTurnStart, roundEndDestroy } from "./lifecycle.js";
 import { RULES } from "./constants.js";
 import type { CardLibrary, TaskDef } from "./defs.js";
 import { RuleError } from "./errors.js";
@@ -103,6 +104,7 @@ export function applyAction(prev: GameState, action: Action, lib: CardLibrary): 
     action.type === "activate" &&
     (activatedSkills(state, lib, action.card).get(action.skill) ?? []).some((c) => c.code === "TIMING" && c.x === "回合開始時");
   if (!turnStartAction) state.turnStartOpen = false;
+  const reputationBefore = Object.fromEntries(state.players.map((x) => [x.id, x.reputation]));
 
   switch (action.type) {
     case "recruit": {
@@ -275,6 +277,8 @@ export function applyAction(prev: GameState, action: Action, lib: CardLibrary): 
     }
   }
 
+  // 聲望下降時的觸發（梅里妲的注視）
+  checkReputationDrops(state, lib, reputationBefore, (player, text) => state.log.push({ round: state.round, player, text }));
   state.rng = rng.snapshot();
   return state;
 }
@@ -368,6 +372,7 @@ function resolveMission(state: GameState, lib: CardLibrary, p: PlayerState, m: N
   }
   ab.onSettle(state, lib, p, m, def, { success, faceSum, slot, emptyBefore, waivedBy: ab.salaryFor(state, lib, m.dispatched).waivedBy }, log);
   ab.onSettleChoices(state, lib, p, m, result, success, log);
+  afterSettle(state, lib, p, m, success, log);
 
   if (success) {
     card.attempts = 0;
@@ -463,18 +468,19 @@ function resolveExpiries(state: GameState, lib: CardLibrary, p: PlayerState, log
 function endTurn(state: GameState, lib: CardLibrary, rng: Rng): void {
   state.turnInRound += 1;
   if (state.turnInRound < state.players.length) {
-    beginTurn(state);
+    beginTurn(state, lib);
     return;
   }
   roundEnd(state, lib, rng);
 }
 
-function beginTurn(state: GameState): void {
+function beginTurn(state: GameState, lib: CardLibrary): void {
   state.phase = "guild";
   state.turnStartOpen = true;
   const p = currentPlayer(state);
   p.actionsLeft = RULES.guildActions;
   p.missionsThisTurn = 0;
+  onTurnStart(state, lib, p, (text) => state.log.push({ round: state.round, player: p.id, text }));
 }
 
 function roundEnd(state: GameState, lib: CardLibrary, rng: Rng): void {
@@ -484,7 +490,8 @@ function roundEnd(state: GameState, lib: CardLibrary, rng: Rng): void {
   for (const p of state.players) {
     for (const uid of p.adventurers) if (ab.resetsAtRoundEnd(state, lib, uid)) state.adventurerCards[uid]!.tapped = false;
   }
-  // 3. 衍生物銷毀、4. 本輪效果結束（M3）
+  // 3. 臨時衍生物銷毀；4. 本輪效果結束（以輪次記錄，自動失效）
+  roundEndDestroy(state, lib, (player, text) => state.log.push({ round: state.round, player, text }));
 
   // 5. 公告欄全部換新
   for (const uid of state.board) if (uid) state.taskDiscard.push(uid);
@@ -509,7 +516,7 @@ function roundEnd(state: GameState, lib: CardLibrary, rng: Rng): void {
   state.round += 1;
   state.startPlayer = (state.startPlayer + 1) % state.players.length;
   state.turnInRound = 0;
-  beginTurn(state);
+  beginTurn(state, lib);
   void rng;
 }
 
