@@ -17,6 +17,7 @@
 
 - [開發說明](docs/development.md)
 - 卡片檢查報告：`data/reports/card-report.md`
+- [能力實作進度](docs/ability-status.md)
 
 ```
 npm install

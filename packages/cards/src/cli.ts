@@ -35,7 +35,8 @@ function build(): { errors: number } {
   const templates = JSON.parse(read(path("skill-templates.json"))) as Template[];
   const issues = [...validate(data), ...checkMapping(data, clauses, templates)];
   const builtAt = now();
-  write(path("cards.json"), JSON.stringify({ builtAt, cards: data }, null, 2) + "\n");
+  // 技能子句一起寫入，發布版本時連同能力一起凍結
+  write(path("cards.json"), JSON.stringify({ builtAt, cards: data, clauses }, null, 2) + "\n");
   write(path("reports", "card-report.md"), renderReport({ data, baseVersion: versionName(index, index.latest), diff, numberUpdates, issues, builtAt }));
 
   const errors = issues.filter((i) => i.level === "error").length;
@@ -61,7 +62,8 @@ function publish(name?: string): void {
     process.exitCode = 1;
     return;
   }
-  const data = (JSON.parse(read(path("cards.json"))) as { cards: CardData }).cards;
+  const built = JSON.parse(read(path("cards.json"))) as { cards: CardData; clauses: unknown };
+  const data = built.cards;
   const index = readIndex();
   const base = index.latest === null ? null : readVersion(index.latest);
   const diff = diffCards(base, data);
@@ -77,7 +79,7 @@ function publish(name?: string): void {
     return;
   }
   const publishedAt = now();
-  write(path("versions", `v${version}.json`), JSON.stringify({ version, name: label, publishedAt, cards: data }, null, 2) + "\n");
+  write(path("versions", `v${version}.json`), JSON.stringify({ version, name: label, publishedAt, cards: data, clauses: built.clauses }, null, 2) + "\n");
   const summary = summarize(diff);
   index.latest = version;
   index.history.push({ version, name: label, publishedAt, summary });

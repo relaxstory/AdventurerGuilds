@@ -27,6 +27,7 @@
 |---|---|
 | `npm run check` | 型別檢查加上全部測試 |
 | `npm test` | 執行測試 |
+| `npm run abilities` | 更新能力實作進度表 `docs/ability-status.md` |
 | `npm run sim -- 200` | 用 AI 玩家跑 200 局模擬，統計整體數據 |
 | `npm run cards:update` | 從 Google 試算表下載最新內容，產生卡片資料與檢查報告 |
 | `npm run cards:build` | 不下載，只用 `data/raw/` 的快照重新產生 |
@@ -53,6 +54,7 @@
 | `setup.ts` | 開局：依卡池組成牌庫、抽王國榮譽卡 |
 | `actions.ts` | 玩家操作：招募、接任務、派遣、逾期懲罰、升級、結束回合；輪末結算 |
 | `honors.ts` | 王國榮譽的評選方式與終局計分 |
+| `abilities.ts` | 卡片能力：依技能子句查詢修正值、在固定時機觸發效果。`IMPLEMENTED` 列出已實作的技能模板 |
 | `bot.ts` | 簡單的 AI 玩家與整局模擬 |
 
 ### 玩家操作
@@ -60,10 +62,10 @@
 | 階段 | 操作 |
 |---|---|
 | 公會階段 | `recruit`（招募，可指定解僱對象）、`acceptTask`（接任務）、`endGuildPhase` |
-| 冒險階段 | `dispatch`（派遣）、`endAdventurePhase`（進入整理階段，自動處理時限與逾期） |
+| 冒險階段 | `dispatch`（選任務與冒險者、支付薪資、橫置）→ `roll`（建立骰池、擲骰）→ `resolve`（計算結果、判定、結算）；`endAdventurePhase`（進入整理階段，自動處理時限與逾期） |
 | 公會整理階段 | `choosePenalty`（逾期懲罰需要選擇時）、`upgrade`（升級公會）、`endTurn` |
 
-尚未實作（M3）：卡片能力、新兵小隊、道具與出售、衍生物、史詩任務背面效果。
+能力的實作進度見 `docs/ability-status.md`（`npm run abilities` 產生）。史詩任務暫時排除。
 
 ## 測試
 

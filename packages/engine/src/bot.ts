@@ -2,13 +2,15 @@
  * 簡單的 AI 玩家：用來自動跑完整局、驗證規則與做平衡模擬。
  * 策略刻意保持單純，不代表最佳玩法。
  */
-import { applyAction, baseDiceOf, salaryOf, stagingSlots, taskDef, upgradeCost, type Action, type ExpiryPenalty } from "./actions.js";
+import { mustDispatch, participationProblem, salaryFor } from "./abilities.js";
+import { applyAction, baseDiceOf, stagingSlots, taskDef, upgradeCost, type Action, type ExpiryPenalty } from "./actions.js";
+import { RuleError } from "./errors.js";
 import type { CardLibrary, CardSource } from "./defs.js";
 import { CardLibrary as Library } from "./defs.js";
 import { createGame } from "./setup.js";
 import { currentPlayer, type GameConfig, type GameState } from "./state.js";
 
-const value = (state: GameState, lib: CardLibrary, uid: string) => baseDiceOf(state, lib, uid) * 2 - salaryOf(state, lib, uid);
+const value = (state: GameState, lib: CardLibrary, uid: string) => baseDiceOf(state, lib, uid) * 2 - salaryFor(state, lib, [uid]).total;
 
 function bestTavernIndex(state: GameState, lib: CardLibrary): number {
   let best = -1;
@@ -45,7 +47,9 @@ function chooseParty(state: GameState, lib: CardLibrary, taskUid: string): strin
     if (!party.length || sum(party) * 3.5 < target - 3) return null;
   }
 
-  const salary = party.reduce((s, uid) => s + salaryOf(state, lib, uid), 0);
+  if (p.missionsThisTurn === 0) for (const must of mustDispatch(state, lib, p)) if (!party.includes(must)) party.push(must);
+  if (participationProblem(state, lib, party)) return null;
+  const salary = salaryFor(state, lib, party).total;
   if (salary > p.gold) return null;
   if (salary > (def.gold ?? 0) + 2 * Math.abs(def.reputation ?? 0) + 2) return null;
   return party;
@@ -77,6 +81,7 @@ export function botAction(state: GameState, lib: CardLibrary): Action {
       return { type: "endGuildPhase" };
     }
     case "adventure": {
+      if (state.mission) return { type: state.mission.stage === "assemble" ? "roll" : "resolve" };
       const tasks = [
         ...p.formal.filter((f) => f.timer !== null).sort((a, b) => a.timer! - b.timer!).map((f) => f.uid),
         ...p.staging,
@@ -108,7 +113,14 @@ export function simulate(config: GameConfig, source: CardSource, maxSteps = 5000
   let state = createGame(config, source);
   for (let step = 0; state.phase !== "gameOver"; step++) {
     if (step >= maxSteps) throw new Error("模擬超過步數上限，可能卡住了");
-    state = applyAction(state, botAction(state, lib), lib);
+    try {
+      state = applyAction(state, botAction(state, lib), lib);
+    } catch (e) {
+      // AI 選了不合法的操作：直接結束目前的階段
+      if (!(e instanceof RuleError)) throw e;
+      const fallback: Action = state.phase === "guild" ? { type: "endGuildPhase" } : state.phase === "adventure" ? { type: "endAdventurePhase" } : { type: "endTurn" };
+      state = applyAction(state, fallback, lib);
+    }
   }
   return state;
 }

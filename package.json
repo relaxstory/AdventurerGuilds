@@ -12,7 +12,8 @@
     "cards:update": "NODE_USE_ENV_PROXY=1 tsx packages/cards/src/cli.ts update",
     "cards:build": "tsx packages/cards/src/cli.ts build",
     "cards:publish": "tsx packages/cards/src/cli.ts publish",
-    "sim": "tsx scripts/simulate.ts"
+    "sim": "tsx scripts/simulate.ts",
+    "abilities": "tsx scripts/ability-status.ts"
   },
   "engines": {
     "node": ">=22"

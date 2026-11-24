@@ -1,3 +1,4 @@
+import * as ab from "./abilities.js";
 import { RULES } from "./constants.js";
 import type { CardLibrary, TaskDef } from "./defs.js";
 import { RuleError } from "./errors.js";
@@ -13,8 +14,12 @@ export type Action =
   /** 公會階段：接取公告欄第 boardIndex 張任務。 */
   | { readonly type: "acceptTask"; readonly boardIndex: number }
   | { readonly type: "endGuildPhase" }
-  /** 冒險階段：派遣冒險者執行任務。 */
+  /** 冒險階段：派遣冒險者執行任務（支付薪資、橫置），進入組隊步驟。 */
   | { readonly type: "dispatch"; readonly task: string; readonly adventurers: readonly string[] }
+  /** 派遣：隊伍確定，建立骰池並擲骰，進入調整步驟。 */
+  | { readonly type: "roll" }
+  /** 派遣：調整完畢，計算結果並結算任務。 */
+  | { readonly type: "resolve" }
   | { readonly type: "endAdventurePhase" }
   /** 公會整理階段：逾期懲罰金幣與聲望都能付時，由玩家選擇。 */
   | { readonly type: "choosePenalty"; readonly task: string; readonly penalty: ExpiryPenalty }
@@ -73,31 +78,35 @@ export function applyAction(prev: GameState, action: Action, lib: CardLibrary): 
   switch (action.type) {
     case "recruit": {
       need("guild", "公會階段");
-      if (p.actionsLeft < 1) throw new RuleError("本回合的公會行動已經用完");
       const uid = state.tavern[action.tavernIndex];
       if (!uid) throw new RuleError("酒館的這個位置沒有冒險者");
+      const free = ab.freeRecruit(state, lib, p, uid);
+      if (!free && p.actionsLeft < 1) throw new RuleError("本回合的公會行動已經用完");
       const name = adventurerFace(state, lib, uid).name;
       if (action.replace !== undefined) {
         const i = p.adventurers.indexOf(action.replace);
         if (i < 0) throw new RuleError("只能解僱自己公會中的冒險者");
         const fired = action.replace;
+        if (!ab.canBeFired(state, lib, fired)) throw new RuleError(`${adventurerFace(state, lib, fired).name} 無法被解僱`);
         p.adventurers.splice(i, 1);
         state.adventurerCards[fired]!.tapped = false;
         // 被解僱的冒險者放進被招募者原本的位置，不從牌庫補牌（docs/spec.md 6.2）
         state.tavern[action.tavernIndex] = fired;
         log(`招募 ${name}，解僱 ${adventurerFace(state, lib, fired).name}`);
       } else {
-        if (p.adventurers.length >= RULES.adventurerCapacity) {
+        const counts = !ab.has(state, lib, uid, "NOT_COUNT_CAPACITY");
+        if (counts && ab.capacityUsed(state, lib, p) >= RULES.adventurerCapacity) {
           throw new RuleError(`冒險者已達上限 ${RULES.adventurerCapacity} 名，請選擇要解僱的冒險者`);
         }
         // 後面的冒險者依序往前補，從牌庫翻開新冒險者放到末端
         state.tavern.splice(action.tavernIndex, 1);
         const next = state.adventurerDeck.shift();
         if (next) state.tavern.push(next);
-        log(`招募 ${name}`);
+        log(`招募 ${name}${free ? "（不需消耗公會行動）" : ""}`);
       }
       p.adventurers.push(uid);
-      p.actionsLeft -= 1;
+      if (!free) p.actionsLeft -= 1;
+      ab.onRecruit(state, lib, p, uid, log);
       break;
     }
 
@@ -121,12 +130,26 @@ export function applyAction(prev: GameState, action: Action, lib: CardLibrary): 
 
     case "dispatch": {
       need("adventure", "冒險階段");
-      dispatch(state, lib, rng, p, action.task, action.adventurers, log);
+      if (state.mission) throw new RuleError("還有進行中的派遣");
+      startMission(state, lib, p, action.task, action.adventurers, log);
+      break;
+    }
+
+    case "roll": {
+      const m = requireMission(state, "assemble");
+      rollMission(state, lib, rng, p, m, log);
+      break;
+    }
+
+    case "resolve": {
+      const m = requireMission(state, "adjust");
+      resolveMission(state, lib, p, m, log);
       break;
     }
 
     case "endAdventurePhase": {
       need("adventure", "冒險階段");
+      if (state.mission) throw new RuleError("還有進行中的派遣");
       state.phase = "cleanup";
       // 1. 正式任務區原有任務的時限 −1，找出逾期的任務
       for (const f of p.formal) {
@@ -160,6 +183,7 @@ export function applyAction(prev: GameState, action: Action, lib: CardLibrary): 
     case "endTurn": {
       need("cleanup", "公會整理階段");
       requireExpiriesResolved(state, lib);
+      ab.onTurnEnd(state, lib, p, log);
       endTurn(state, lib, rng);
       break;
     }
@@ -169,17 +193,17 @@ export function applyAction(prev: GameState, action: Action, lib: CardLibrary): 
   return state;
 }
 
-// ── 冒險階段：派遣 ──
+// ── 冒險階段：派遣（docs/spec.md 7.1）──
 
-function dispatch(
-  state: GameState,
-  lib: CardLibrary,
-  rng: Rng,
-  p: PlayerState,
-  taskUid: string,
-  party: readonly string[],
-  log: (text: string, dice?: number[]) => void,
-): void {
+function requireMission(state: GameState, stage: "assemble" | "adjust") {
+  const m = state.mission;
+  if (state.phase !== "adventure" || !m) throw new RuleError("目前沒有進行中的派遣");
+  if (m.stage !== stage) throw new RuleError(stage === "assemble" ? "已經擲過骰了" : "還沒有擲骰");
+  return m;
+}
+
+/** 選任務、選冒險者、支付薪資、橫置。 */
+function startMission(state: GameState, lib: CardLibrary, p: PlayerState, taskUid: string, party: readonly string[], log: (text: string) => void): void {
   const inStaging = p.staging.includes(taskUid);
   const inFormal = p.formal.some((f) => f.uid === taskUid);
   if (!inStaging && !inFormal) throw new RuleError("只能執行自己暫存格或正式任務區的任務");
@@ -192,24 +216,58 @@ function dispatch(
     if (!p.adventurers.includes(uid)) throw new RuleError("只能派遣自己公會中的冒險者");
     if (state.adventurerCards[uid]!.tapped) throw new RuleError(`${adventurerFace(state, lib, uid).name} 已經橫置，不能派遣`);
   }
+  const problem = ab.participationProblem(state, lib, party);
+  if (problem) throw new RuleError(problem);
 
-  // 擲骰前支付薪資（docs/spec.md 7.1）
-  const salary = party.reduce((s, uid) => s + salaryOf(state, lib, uid), 0);
+  const { total: salary } = ab.salaryFor(state, lib, party);
+  if (p.missionsThisTurn === 0) {
+    for (const must of ab.mustDispatch(state, lib, p)) {
+      const withMust = ab.salaryFor(state, lib, [...party, must]).total;
+      if (!party.includes(must) && p.gold >= withMust) {
+        throw new RuleError(`本回合的第一個任務必須派遣 ${adventurerFace(state, lib, must).name}`);
+      }
+    }
+  }
+  // 擲骰前支付薪資
   if (p.gold < salary) throw new RuleError(`金幣不足：薪資需要 ${salary} 金，目前只有 ${p.gold} 金`);
   p.gold -= salary;
-  for (const uid of party) state.adventurerCards[uid]!.tapped = true;
+  for (const uid of party) if (ab.tapOnDispatch(state, lib, uid, log)) state.adventurerCards[uid]!.tapped = true;
+  p.missionsThisTurn += 1;
+  const names = party.map((uid) => adventurerFace(state, lib, uid).name).join("、");
+  log(`派遣 ${names} 執行「${def.name}」，支付薪資 ${salary} 金`);
+  state.mission = { task: taskUid, dispatched: [...party], joined: [], salary, stage: "assemble", dice: [], pool: 0, removedBy: {} };
+}
 
-  const dice = rng.rollDice(party.reduce((s, uid) => s + baseDiceOf(state, lib, uid), 0));
-  const result = dice.reduce((a, b) => a + b, 0);
+/** 隊伍確定：參與時的效果、建立骰池、擲骰、擲骰後的強制效果。 */
+function rollMission(state: GameState, lib: CardLibrary, rng: Rng, p: PlayerState, m: NonNullable<GameState["mission"]>, log: (text: string, dice?: number[]) => void): void {
+  const def = taskDef(state, lib, m.task);
+  ab.onParticipate(state, lib, p, m, log);
+  m.pool = ab.dicePool(state, lib, m, def);
+  m.dice = rng.rollDice(m.pool);
+  log(`擲 ${m.pool} 顆骰子`, [...m.dice]);
+  ab.afterRollMandatory(state, lib, m, def, log);
+  m.stage = "adjust";
+}
+
+/** 計算結果值、套用難度調整、判定與結算（docs/spec.md 7.4）。 */
+function resolveMission(state: GameState, lib: CardLibrary, p: PlayerState, m: NonNullable<GameState["mission"]>, log: (text: string, dice?: number[]) => void): void {
+  const taskUid = m.task;
+  const def = taskDef(state, lib, taskUid);
+  const c = def.condition!;
   const card = state.taskCards[taskUid]!;
-  const n = card.attempts; // 每枚嘗試指示物＝難度調整 1
-  const c = def.condition;
+  const faceSum = m.dice.reduce((a, b) => a + b, 0);
+  const result = faceSum + ab.resultModifier(state, lib, m, def);
+  const n = ab.difficulty(state, lib, m, def);
   // 區間條件由玩家分配難度調整到兩端，等同於結果落在 [X−n, Y+n] 內即可
   const success =
     c.op === "atLeast" ? result >= c.x - n : c.op === "atMost" ? result <= c.x + n : result >= c.x - n && result <= c.y + n;
-  const names = party.map((uid) => adventurerFace(state, lib, uid).name).join("、");
+  const slotEntry = p.formal.find((f) => f.uid === taskUid);
+  const slot = slotEntry ? slotEntry.timer : null;
+  const emptyBefore = new Set([1, 2, 3].filter((t) => !p.formal.some((f) => f.timer === t && f.uid !== taskUid)));
   const isEpic = def.type === "史詩";
   if (isEpic) state.epicTried.push(taskUid);
+  const condText = c.op === "atLeast" ? `≥${c.x}` : c.op === "atMost" ? `≤${c.x}` : `${c.x}～${c.y}`;
+  const adjText = n ? `（難度調整 ${n}）` : "";
 
   if (success) {
     const penalty = RULES.distrust.goldPenalty[Math.min(p.distrust, RULES.distrust.max)] ?? 0;
@@ -217,6 +275,13 @@ function dispatch(
     p.gold += gold;
     p.reputation += def.reputation ?? 0;
     if (p.distrust > 0) p.distrust -= 1; // 先用目前層數扣報酬，再消除 1 層
+    log(`「${def.name}」結果值 ${result}，目標 ${condText}${adjText}：成功，獲得 ${gold} 金、聲望 ${signed(def.reputation ?? 0)}`, [...m.dice]);
+  } else {
+    log(`「${def.name}」結果值 ${result}，目標 ${condText}${adjText}：失敗`, [...m.dice]);
+  }
+  ab.onSettle(state, lib, p, m, def, { success, faceSum, slot, emptyBefore, waivedBy: ab.salaryFor(state, lib, m.dispatched).waivedBy }, log);
+
+  if (success) {
     card.attempts = 0;
     if (def.type === "永久") {
       card.completions += 1; // 永久任務留在 [∞]，可以重複完成（docs/spec.md 7.6）
@@ -224,16 +289,15 @@ function dispatch(
       removeTask(p, taskUid);
       p.completed.push(taskUid);
     }
-    log(`派遣 ${names} 執行「${def.name}」，支付薪資 ${salary} 金，擲出 ${result}：成功，獲得 ${gold} 金、聲望 ${signed(def.reputation ?? 0)}`, dice);
   } else if (isEpic) {
-    // 史詩任務失敗：翻面結算背面效果（M3），不獲得正面獎勵
+    // 史詩任務失敗：翻面結算背面效果（暫時排除），不獲得正面獎勵
     removeTask(p, taskUid);
     state.taskDiscard.push(taskUid);
-    log(`派遣 ${names} 執行史詩任務「${def.name}」，支付薪資 ${salary} 金，擲出 ${result}：失敗`, dice);
   } else {
     card.attempts += 1;
-    log(`派遣 ${names} 執行「${def.name}」，支付薪資 ${salary} 金，擲出 ${result}：失敗，獲得嘗試指示物（共 ${card.attempts} 枚）`, dice);
+    log(`「${def.name}」獲得嘗試指示物（共 ${card.attempts} 枚）`);
   }
+  state.mission = null;
 }
 
 function removeTask(p: PlayerState, uid: string): void {
@@ -319,12 +383,18 @@ function endTurn(state: GameState, lib: CardLibrary, rng: Rng): void {
 
 function beginTurn(state: GameState): void {
   state.phase = "guild";
-  currentPlayer(state).actionsLeft = RULES.guildActions;
+  const p = currentPlayer(state);
+  p.actionsLeft = RULES.guildActions;
+  p.missionsThisTurn = 0;
 }
 
 function roundEnd(state: GameState, lib: CardLibrary, rng: Rng): void {
-  // 1. 輪末效果（M3）；2. 所有冒險者重置
-  for (const p of state.players) for (const uid of p.adventurers) state.adventurerCards[uid]!.tapped = false;
+  // 1. 輪末效果
+  ab.onRoundEnd(state, lib, (p, text) => state.log.push({ round: state.round, player: p.id, text }));
+  // 2. 所有冒險者重置（「不會於輪末重置」的除外）
+  for (const p of state.players) {
+    for (const uid of p.adventurers) if (ab.resetsAtRoundEnd(state, lib, uid)) state.adventurerCards[uid]!.tapped = false;
+  }
   // 3. 衍生物銷毀、4. 本輪效果結束（M3）
 
   // 5. 公告欄全部換新

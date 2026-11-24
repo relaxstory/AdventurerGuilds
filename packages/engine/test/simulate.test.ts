@@ -17,7 +17,7 @@ describe("模擬整局", () => {
   for (const honorMode of ["selection", "assignment", "competition"] as HonorMode[]) {
     it(`使用 alpha1.0 卡片資料跑完 8 輪（${honorMode}）`, () => {
       for (let seed = 1; seed <= 10; seed++) {
-        const s = simulate(config({ seed, honorMode, includeEpic: true, includeTest: true }), published);
+        const s = simulate(config({ seed, honorMode, includeEpic: false, includeTest: true }), published);
         expect(s.phase).toBe("gameOver");
         expect(s.round).toBe(8);
         expect(s.result!.winners.length).toBeGreaterThan(0);

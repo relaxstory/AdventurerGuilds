@@ -28,6 +28,24 @@ export interface AdventurerCard {
   face: "front" | "back";
   tapped: boolean;
   tokens: Record<string, number>;
+  /** 本輪已經用過「每輪第一次派遣不橫置」的輪次。 */
+  freeDispatchRound?: number;
+}
+
+/** 進行中的派遣（docs/spec.md 7.1）。組隊 → 擲骰 → 調整 → 結算。 */
+export interface Mission {
+  readonly task: string;
+  /** 被派遣的冒險者（支付薪資）。 */
+  readonly dispatched: string[];
+  /** 以其他方式加入、不視為派遣的冒險者（例如瑞斯教授的空間傳送）。 */
+  readonly joined: string[];
+  readonly salary: number;
+  stage: "assemble" | "adjust";
+  dice: number[];
+  /** 骰池建構時的骰數。 */
+  pool: number;
+  /** 因能力移除的骰子數，依冒險者 uid 記錄（莎莉【應該也不算太差？】）。 */
+  removedBy: Record<string, number>;
 }
 
 export interface TaskCard {
@@ -52,6 +70,8 @@ export interface PlayerState {
   distrust: number;
   upgraded: boolean;
   actionsLeft: number;
+  /** 本回合已經執行的派遣次數。 */
+  missionsThisTurn: number;
   adventurers: string[];
   staging: string[];
   formal: FormalTask[];
@@ -102,6 +122,8 @@ export interface GameState {
   taskDiscard: string[];
   /** 本局使用的王國榮譽卡。 */
   honors: string[];
+  /** 冒險階段：進行中的派遣。 */
+  mission: Mission | null;
   /** 公會整理階段：還沒處理的逾期任務（遇到需要玩家選擇懲罰的任務時停下）。 */
   pendingExpiry: string[];
   /** 史詩任務：已經嘗試過的任務（只能嘗試一次）。 */

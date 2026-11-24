@@ -1,3 +1,4 @@
+import { raceOf } from "./abilities.js";
 import type { CardLibrary, TaskDef } from "./defs.js";
 import type { GameResult, GameState, HonorResult, PlayerState } from "./state.js";
 
@@ -51,7 +52,7 @@ export const HONOR_RULES: Record<string, Evaluator> = {
   H17: (ctx, p) => faces(ctx, p).reduce((s, a) => s + (a.baseDice ?? 0), 0), // 兵強馬壯
   H18: (ctx, p) => maxGroup(faces(ctx, p).map((a) => stripB(a.profession))), // 術業專攻
   H19: (ctx, p) => new Set(faces(ctx, p).map((a) => stripB(a.profession)).filter(Boolean)).size, // 百工百業
-  H20: (ctx, p) => new Set(faces(ctx, p).map((a) => stripB(a.race)).filter(Boolean)).size, // 多元共榮
+  H20: (ctx, p) => new Set(p.adventurers.map((uid) => raceOf(ctx.state, ctx.lib, uid)).filter(Boolean)).size, // 多元共榮（菲特視為人類）
   H21: (ctx, p) => count(faces(ctx, p), (a) => a.traits.includes("[王國]")), // 王國棟樑
 };
 

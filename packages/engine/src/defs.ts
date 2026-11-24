@@ -35,10 +35,33 @@ export interface HonorDef {
   readonly status: string;
 }
 
+/** 技能子句對照表的一列（data/skill-mapping.csv）。 */
+export interface ClauseRow {
+  readonly cardId: string;
+  readonly cardName: string;
+  readonly order: string;
+  readonly skillName: string;
+  readonly clause: string;
+  readonly code: string;
+  readonly x: string;
+  readonly y: string;
+  readonly z: string;
+}
+
+/** 卡片上的一個技能子句，對應一個技能模板。 */
+export interface ClauseDef {
+  readonly skill: string;
+  readonly code: string;
+  readonly x: string;
+  readonly y: string;
+  readonly z: string;
+}
+
 export interface CardSource {
   readonly adventurers: readonly AdventurerDef[];
   readonly tasks: readonly TaskDef[];
   readonly honors: readonly HonorDef[];
+  readonly clauses?: readonly ClauseRow[];
 }
 
 /** 依實裝狀態整理出本局可用的卡池，並建立查詢表。 */
@@ -50,8 +73,19 @@ export class CardLibrary {
   readonly taskPool: string[] = [];
   readonly epicPool: string[] = [];
   readonly honorPool: string[] = [];
+  /** 卡片編號＋名稱 → 技能子句（依技能順序、子句順序排列）。 */
+  private readonly clauseMap = new Map<string, ClauseDef[]>();
 
   constructor(source: CardSource, includeTest: boolean) {
+    const rows = [...(source.clauses ?? [])].sort(
+      (a, b) => Number(a.order) - Number(b.order) || Number(a.clause) - Number(b.clause),
+    );
+    for (const r of rows) {
+      const key = `${r.cardId}｜${r.cardName}`;
+      const list = this.clauseMap.get(key) ?? [];
+      list.push({ skill: r.skillName, code: r.code, x: r.x, y: r.y, z: r.z });
+      this.clauseMap.set(key, list);
+    }
     const usable = (status: string) => status === "實裝" || (includeTest && status === "測試");
     for (const a of source.adventurers) {
       this.adventurers.set(a.id, a);
@@ -68,6 +102,11 @@ export class CardLibrary {
       this.honors.set(h.id, h);
       if (usable(h.status) && h.kind === "排名型") this.honorPool.push(h.id);
     }
+  }
+
+  /** 卡片的技能子句；沒有對照資料時回傳空陣列。 */
+  clauses(card: { readonly id: string; readonly name: string }): readonly ClauseDef[] {
+    return this.clauseMap.get(`${card.id}｜${card.name}`) ?? [];
   }
 
   adventurer(id: string): AdventurerDef {

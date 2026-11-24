@@ -6,6 +6,8 @@ import { currentPlayer, type GameState } from "../src/state.js";
 import { adv, setup, source, task } from "./fixture.js";
 
 const run = (state: GameState, lib: CardLibrary, ...actions: Action[]) => actions.reduce((s, a) => applyAction(s, a, lib), state);
+/** 完整的一次派遣：派遣 → 擲骰 → 結算。 */
+const go = (task: string, adventurers: string[]): Action[] => [{ type: "dispatch", task, adventurers }, { type: "roll" }, { type: "resolve" }];
 
 /** 讓目前玩家直接擁有指定的冒險者與任務（略過招募與接取）。 */
 function give(state: GameState, adventurers: number, tasks: string[] = []): GameState {
@@ -89,7 +91,7 @@ describe("冒險階段", () => {
     const { s, lib } = ready(["OK"]);
     const p = currentPlayer(s);
     const t = p.staging[0]!;
-    const out = run(s, lib, { type: "dispatch", task: t, adventurers: [p.adventurers[0]!] });
+    const out = run(s, lib, ...go(t, [p.adventurers[0]!]));
     const q = currentPlayer(out);
     expect(q.gold).toBe(5 - 2 + 6);
     expect(q.reputation).toBe(1);
@@ -102,9 +104,9 @@ describe("冒險階段", () => {
     const { s, lib } = ready(["NO"]);
     const p = currentPlayer(s);
     const t = p.staging[0]!;
-    let out = run(s, lib, { type: "dispatch", task: t, adventurers: [p.adventurers[0]!] });
+    let out = run(s, lib, ...go(t, [p.adventurers[0]!]));
     expect(out.taskCards[t]!.attempts).toBe(1);
-    out = run(out, lib, { type: "dispatch", task: t, adventurers: [p.adventurers[1]!] });
+    out = run(out, lib, ...go(t, [p.adventurers[1]!]));
     expect(out.taskCards[t]!.attempts).toBe(2);
     expect(currentPlayer(out).gold).toBe(1);
   });
@@ -113,18 +115,18 @@ describe("冒險階段", () => {
     const { s, lib } = ready(["NO"]);
     const p = currentPlayer(s);
     p.gold = 1;
-    expect(() => run(s, lib, { type: "dispatch", task: p.staging[0]!, adventurers: [p.adventurers[0]!] })).toThrow("金幣不足");
+    expect(() => run(s, lib, ...go(p.staging[0]!, [p.adventurers[0]!]))).toThrow("金幣不足");
     p.gold = 5;
-    const out = run(s, lib, { type: "dispatch", task: p.staging[0]!, adventurers: [p.adventurers[0]!] });
-    expect(() => run(out, lib, { type: "dispatch", task: p.staging[0]!, adventurers: [p.adventurers[0]!] })).toThrow("已經橫置");
+    const out = run(s, lib, ...go(p.staging[0]!, [p.adventurers[0]!]));
+    expect(() => run(out, lib, ...go(p.staging[0]!, [p.adventurers[0]!]))).toThrow("已經橫置");
   });
 
   it("永久任務完成後留下來，放完成指示物，不進任務完成區", () => {
     const { s, lib } = ready(["P"]);
     const p = currentPlayer(s);
     const t = p.staging[0]!;
-    let out = run(s, lib, { type: "dispatch", task: t, adventurers: [p.adventurers[0]!] });
-    out = run(out, lib, { type: "dispatch", task: t, adventurers: [p.adventurers[1]!] });
+    let out = run(s, lib, ...go(t, [p.adventurers[0]!]));
+    out = run(out, lib, ...go(t, [p.adventurers[1]!]));
     expect(out.taskCards[t]!.completions).toBe(2);
     expect(currentPlayer(out).completed).toEqual([]);
     expect(currentPlayer(out).staging).toEqual([t]);
@@ -134,7 +136,7 @@ describe("冒險階段", () => {
     const { s, lib } = ready(["OK"]);
     const p = currentPlayer(s);
     p.distrust = 2;
-    const out = run(s, lib, { type: "dispatch", task: p.staging[0]!, adventurers: [p.adventurers[0]!] });
+    const out = run(s, lib, ...go(p.staging[0]!, [p.adventurers[0]!]));
     expect(currentPlayer(out).gold).toBe(5 - 2 + (6 - 2));
     expect(currentPlayer(out).distrust).toBe(1);
   });
@@ -245,7 +247,7 @@ describe("回合與輪末", () => {
   it("不合法的操作不會改動原本的狀態", () => {
     const { state, lib } = setup();
     const copy = structuredClone(state);
-    expect(() => run(state, lib, { type: "dispatch", task: "t1", adventurers: [] })).toThrow(RuleError);
+    expect(() => run(state, lib, ...go("t1", []))).toThrow(RuleError);
     expect(state).toEqual(copy);
   });
 });

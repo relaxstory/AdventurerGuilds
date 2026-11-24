@@ -17,7 +17,7 @@ let n = 0, done = 0, gold = 0, broke = 0, up = 0, distrust = 0, rep = 0, dispatc
 const awarded: Record<string, number> = {};
 const seen: Record<string, number> = {};
 for (let seed = 1; seed <= games; seed++) {
-  const s = simulate({ seed, players, honorMode, honorDraw: "balanced", includeEpic: true, includeTest: true }, cards);
+  const s = simulate({ seed, players, honorMode, honorDraw: "balanced", includeEpic: false, includeTest: true }, cards);
   for (const p of s.players) {
     n++;
     done += p.completed.length;
