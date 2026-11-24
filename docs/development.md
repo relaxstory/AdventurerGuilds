@@ -10,6 +10,7 @@
 | 位置 | 內容 |
 |---|---|
 | `packages/engine` | 規則引擎（純邏輯，不碰網路與資料庫）。`applyAction(狀態, 操作)` 回傳新狀態；包含開局、公會／冒險／整理階段、輪末、王國榮譽計分與 AI 玩家 |
+| `packages/web` | M4 測試模式的網頁（React + Vite），直接在瀏覽器執行規則引擎，打包成單一 HTML 檔 |
 | `scripts/simulate.ts` | 多局模擬統計 |
 | `packages/cards` | 卡片資料管線：讀取試算表、轉成資料、檢查、比對差異、發布版本 |
 | `data/raw/` | 試算表各分頁的 CSV 快照 |
@@ -27,6 +28,8 @@
 |---|---|
 | `npm run check` | 型別檢查加上全部測試 |
 | `npm test` | 執行測試 |
+| `npm run web:dev` | 啟動測試模式的開發伺服器 |
+| `npm run web:build` | 打包測試模式為 `packages/web/dist/index.html`（單一檔案，用瀏覽器直接開啟） |
 | `npm run abilities` | 更新能力實作進度表 `docs/ability-status.md` |
 | `npm run sim -- 200` | 用 AI 玩家跑 200 局模擬，統計整體數據 |
 | `npm run cards:update` | 從 Google 試算表下載最新內容，產生卡片資料與檢查報告 |

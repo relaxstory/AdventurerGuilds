@@ -31,3 +31,5 @@ export {
 export { activate, activatedSkills, activationImplemented, decide, type ActivateParams, type Decision } from "./activate.js";
 export { canTarget } from "./abilities.js";
 export { gainItem, itemSlots, sellPrice, useItem, type UseItemParams } from "./items.js";
+export * as abilities from "./abilities.js";
+export * as items from "./items.js";
