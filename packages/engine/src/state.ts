@@ -30,7 +30,7 @@ export interface AdventurerCard {
   tokens: Record<string, number>;
   /** 本輪已經用過「每輪第一次派遣不橫置」的輪次。 */
   freeDispatchRound?: number;
-  /** 本回合被派遣的次數：回合識別（輪-回合）與次數。 */
+  /** 本輪被派遣的次數：輪次識別與次數。 */
   dispatches?: { turn: string; count: number };
 }
 

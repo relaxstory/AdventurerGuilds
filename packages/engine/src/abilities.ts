@@ -185,20 +185,21 @@ export function participationProblem(state: GameState, lib: CardLibrary, party: 
   return null;
 }
 
-const turnId = (state: GameState) => `${state.round}-${state.turnInRound}`;
+/** 派遣次數以「輪」計算（方庚【隨時警備】：每輪只能派遣一次）。 */
+const turnId = (state: GameState) => `${state.round}`;
 
-/** 本回合已經被派遣的次數。 */
+/** 本輪已經被派遣的次數。 */
 export function dispatchesThisTurn(state: GameState, uid: string): number {
   const d = state.adventurerCards[uid]!.dispatches;
   return d && d.turn === turnId(state) ? d.count : 0;
 }
 
-/** 每回合派遣次數上限（方庚【隨時警備】）；超過時回傳提示訊息。 */
+/** 每輪派遣次數上限（方庚【隨時警備】）；超過時回傳提示訊息。 */
 export function dispatchLimitProblem(state: GameState, lib: CardLibrary, party: readonly string[]): string | null {
   for (const uid of party) {
     for (const c of clauses(state, lib, uid, "DISPATCH_LIMIT_PER_TURN")) {
       const limit = amount(state, lib, uid, c.x);
-      if (dispatchesThisTurn(state, uid) >= limit) return `${faceOf(state, lib, uid).name} 每回合只能被派遣 ${limit} 次`;
+      if (dispatchesThisTurn(state, uid) >= limit) return `${faceOf(state, lib, uid).name} 每輪只能派遣 ${limit} 次`;
     }
   }
   return null;

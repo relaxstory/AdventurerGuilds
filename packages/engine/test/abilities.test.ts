@@ -77,7 +77,7 @@ describe("派遣與橫置", () => {
     expect(ab.salaryFor(state, lib, [fang!, leon!]).total).toBe(3 + 3); // 萊昂是參謀，不免除
   });
 
-  it("方庚【隨時警備】：派遣後仍是直立，但每回合只能被派遣 1 次；下一個回合可以再派遣", () => {
+  it("方庚【隨時警備】：派遣後仍是直立，但每輪只能派遣 1 次；下一輪可以再派遣", () => {
     let { state, lib } = realGame();
     const [fang] = hire(state, "STD-C38");
     const t = take(state, "STD-M01");
@@ -85,8 +85,8 @@ describe("派遣與橫置", () => {
     currentPlayer(state).gold = 50;
     state = run(state, lib, { type: "dispatch", task: t, adventurers: [fang!] }, { type: "roll" }, { type: "resolve" });
     expect(state.adventurerCards[fang!]!.tapped).toBe(false);
-    expect(() => run(state, lib, { type: "dispatch", task: t, adventurers: [fang!] })).toThrow("每回合只能被派遣 1 次");
-    state.adventurerCards[fang!]!.dispatches = { turn: "上一個回合", count: 1 }; // 模擬換到下一個回合
+    expect(() => run(state, lib, { type: "dispatch", task: t, adventurers: [fang!] })).toThrow("每輪只能派遣 1 次");
+    state.round += 1; // 下一輪
     expect(() => run(state, lib, { type: "dispatch", task: t, adventurers: [fang!] })).not.toThrow();
   });
 

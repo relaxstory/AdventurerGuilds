@@ -43,9 +43,9 @@
   },
   {
     "code": "DISPATCH_LIMIT_PER_TURN",
-    "name": "每回合派遣次數上限",
+    "name": "每輪派遣次數上限",
     "type": "常駐",
-    "text": "此冒險者每回合只能被派遣{X}次。",
+    "text": "此冒險者每輪只能派遣{X}次。",
     "params": "X＝次數"
   },
   {
