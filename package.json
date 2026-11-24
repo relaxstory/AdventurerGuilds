@@ -1,0 +1,25 @@
+{
+  "name": "adventurer-guilds",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc -b",
+    "check": "npm run typecheck && npm test",
+    "cards:update": "NODE_USE_ENV_PROXY=1 tsx packages/cards/src/cli.ts update",
+    "cards:build": "tsx packages/cards/src/cli.ts build",
+    "cards:publish": "tsx packages/cards/src/cli.ts publish"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.8"
+  }
+}

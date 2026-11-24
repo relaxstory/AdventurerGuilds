@@ -1,8 +1,10 @@
-"""技能模板清單與卡片對照表的來源資料。
+"""技能模板清單的來源資料。
 
 執行後產生：
-- docs/skill-templates.md  技能模板清單
-- data/skill-mapping.csv    每張卡的技能子句與參數
+- docs/skill-templates.md   技能模板清單
+- data/skill-templates.json 給卡片資料管線使用的模板清單
+
+每張卡的子句對照表 data/skill-mapping.csv 由卡片資料管線維護，本腳本只讀取。
 """
 import csv, os
 from collections import defaultdict
@@ -134,151 +136,10 @@ T = [
  ("TASK_DESTROY_PARTICIPANTS", "銷毀參與者", "效果", "銷毀{X}位參與此任務的冒險者。若有{Y}冒險者參與，可改為銷毀{Z}位參與此任務的{Y}冒險者。", "X＝數量；Y＝職業；Z＝數量"),
 ]
 
-# 對照表：(卡片編號, 卡名, 技能順序, 技能名稱, 子句, 模板代碼, X, Y, Z, 備註)
-M = []
-def add(cid, name, order, sname, clauses, note=""):
-    for i, c in enumerate(clauses, 1):
-        code, *params = c
-        params += [""] * (3 - len(params))
-        M.append((cid, name, order, sname, i, code, *params[:3], note if i == 1 else ""))
-
-A = add
-A("STD-C01","富豪 巴克",1,"【坐著數錢就好】",[("NO_ROUND_RESET",),("ROUNDEND_IF_TAPPED_GAIN","2","金幣")])
-A("STD-C01","富豪 巴克",2,"【時間就是金錢，朋友！】",[("COST","","5"),("EFF_RESET","1"),("EFF_FLIP_SELF",)])
-A("STD-C01B","流浪漢 巴克",1,"【只能工作了嗎？】",[("NO_TAP_FIRST_DISPATCH",)])
-A("STD-C02","「蛇眼」布萊克",1,"【黑吃黑】",[("NO_ROUND_RESET",),("ROUNDEND_IF_TAPPED_GAIN","-1","聲望")])
-A("STD-C02","「蛇眼」布萊克",2,"【嘶嘶嘶嘶～】",[("COST","橫置此冒險者","5"),("EFF_RETRIEVE_TASK",)])
-A("STD-C03","巴爾",1,"【慶祝你還活著…嗝！】",[("NO_ROUND_RESET",),("SETTLE_IF_TAPPED_GAIN","橫置冒險者數","金幣")])
-A("STD-C03","巴爾",2,"【我敬你一杯！】",[("COST","橫置此冒險者","5"),("EFF_DISCARD_RECRUIT",)])
-for cid,name,code,x,y,z in [
- ("STD-C04","新兵 湯姆","SQUAD_DICE","2","1",""),
- ("STD-C05","新兵 芬","SQUAD_COMPLETE_GAIN","2","1","金幣"),
- ("STD-C06","新兵 哈克貝里","SQUAD_SALARY","2","-1",""),
- ("STD-C07","新兵 喬","SQUAD_COMPLETE_GAIN","3","1","聲望"),
- ("STD-C08","新兵 貝琪","SQUAD_RESULT_ADJUST","3","1",""),
- ("STD-C09","新兵 席德","SQUAD_COMPLETE_GAIN","3","-1","聲望"),
- ("STD-C10","新兵 哈伯","SQUAD_DIFFICULTY","3","1","")]:
-    A(cid,name,1,"【集結】",[("SQUAD","新兵")])
-    A(cid,name,2,"【為了王國！】",[(code,x,y,z)])
-A("STD-C11","那個忠誠的勇者",1,"【聲名遠播】",[("ON_RECRUIT_GAIN","3","聲望")])
-A("STD-C11","那個忠誠的勇者",2,"【卸甲歸田】",[("ON_RETURN_TAVERN_FLIP",)])
-A("STD-C11B","那個賴皮的勇者",1,"【賴著不走】",[("ON_FLIP_RECRUIT_SELF",)])
-A("STD-C11B","那個賴皮的勇者",2,"【就是不走】",[("CANNOT_BE_FIRED",)])
-A("STD-C12","「打手」布魯斯與威利",1,"【布魯斯！】",[("COST","橫置此冒險者","2"),("EFF_OPPONENT_TAP_OR_PAY","3")])
-A("STD-C12","「打手」布魯斯與威利",2,"【威利！】",[("REDIRECT_TARGETING",)])
-A("STD-C13","「飛毛腿」萊利",1,"【借過借過借過~~】",[("COMPLETE_GAIN","緊急","1","金幣")])
-A("STD-C14","「火焰」伊格納斯",1,"【完美火候】",[("COMPLETE_GAIN","[巧手]","1","金幣")])
-A("STD-C15","暗影",1,"【充分準備】",[("NO_TAP_FIRST_DISPATCH",)])
-A("STD-C15","暗影",2,"【狡兔三窟】",[("UNTARGETABLE_BY_TRAIT","[王國]")])
-A("STD-C16","「獵犬」方葵",1,"【守株待兔】",[("NO_TAP_FIRST_DISPATCH",)])
-A("STD-C16","「獵犬」方葵",2,"【天羅地網】",[("COST","橫置此冒險者"),("EFF_TAP_WITH_TRAIT","[潛行]")])
-A("STD-C17","里諾",1,"【你好，我可以逮捕你嗎？】",[("COST","橫置此冒險者"),("EFF_OPPONENT_TAP_OR_FLIP",)])
-A("STD-C17B","「狂人」里諾",1,"【我給過你機會了】",[("ON_FLIP_TAP_FLIPPER",)])
-A("STD-C18","「天才」瑪絲珂",1,"【等一下……我聽到了啦！】",[("ROUNDEND_IF_UPRIGHT_TOKEN","1","精工")])
-A("STD-C18","「天才」瑪絲珂",2,"【工作室】",[("ON_RECRUIT_WORKSHOP","小嗶","3")])
-A("STD-C18","「天才」瑪絲珂",3,"【小嗶！出動！】",[("COST","橫置此冒險者"),("EFF_CREATE_FROM_WORKSHOP",)])
-A("STD-C19","暴走小嗶",1,"【嗶！（跑！）】",[("SHUFFLE_BACK_WITH","「天才」瑪絲珂")])
-A("STD-C19","暴走小嗶",2,"【嗶！（交給我！）】",[("ANY_PROFESSION",)])
-A("STD-C20","第六兵團長 瓦雷諾",1,"【老兵】",[("AFTER_ROLL_REROLL","","1")])
-A("STD-C20","第六兵團長 瓦雷諾",2,"【你們走，我留下。】",[("REPLACE_DESTROY_ALLY","[王國]")])
-A("STD-C21","第六兵團副團長 萊昂",1,"【風險評估】",[("TASK_DIFFICULTY","","1")])
-A("STD-C22","艾伯特．暗爐",1,"【回爐重造】",[("COMPLETE_GAIN","[巧手]","1","金幣")])
-A("STD-C23","老約翰",1,"【熟門熟路】",[("TASK_DIFFICULTY","[森林]","2")])
-A("STD-C23","老約翰",2,"【森林瑰寶】",[("COMPLETE_GAIN_ITEM","[森林]","鹿腿肉／紅斑菌菇／獸皮")])
-A("STD-C24","衛兵 查理",1,"【例行公事】",[("TASK_DIFFICULTY","永久","1")])
-A("STD-C25","衛兵 呂昶",1,"【追捕默契】",[("WITH_CARD_DIFFICULTY","衛兵 凱蒂","1")])
-A("STD-C26","衛兵 凱蒂",1,"【追捕默契】",[("WITH_CARD_DIFFICULTY","衛兵 呂昶","1")])
-A("STD-C27","伊蓮娜．蕨葉",1,"【加一點這個，然後是這個……】",[("TIMING","公會階段"),("COST","","","2 [藥材]"),("EFF_GAIN_ITEM_CHOICE","伊蓮娜的強壯藥劑／伊蓮娜的縮小藥劑／伊蓮娜的精力藥劑")],"「銷毀兩個藥材」視為代價")
-A("STD-C28","馬克",1,"【善心助人】",[("PARTICIPATE_GAIN","1","聲望")])
-A("STD-C28","馬克",2,"【一朝被蛇咬】",[("CANNOT_PARTICIPATE_WITH","[狡詐]")])
-A("STD-C29","芙蕾雅．霜語",1,"【來自遠方的鼓勵】",[("ON_RECRUIT_GAIN_ITEM","父親的家書")])
-A("STD-C29","芙蕾雅．霜語",2,"【永不言棄】",[("TASK_DIFFICULTY","有嘗試指示物","1")])
-A("STD-C30","戈拉古斯．泥鏟",1,"【先讓我把它畫下來】",[("COMPLETE_GAIN_ITEM","[遺跡]","戈拉古斯的手稿")],"[遺跡] 為預留標籤")
-A("STD-C31","羅德教授",1,"【審時度勢】",[("AFTER_ROLL_TURN","[聰明]","2")])
-A("STD-C32","「冒失鬼」莎莉",1,"【唉呦！】",[("AFTER_ROLL_REMOVE_FACE","[聰明]","6")])
-A("STD-C32","「冒失鬼」莎莉",2,"【應該也不算太差？】",[("PER_REMOVED_DIE_GAIN","1","金幣")])
-A("STD-C33","阿絲特拉．星詠",1,"【當眾星連線時……】",[("SETTLE_PARITY_GAIN","偶數","1","聲望")])
-A("STD-C33","阿絲特拉．星詠",2,"【只要還有希望，就還有機會！】",[("AFTER_ROLL_TURN","","1")])
-A("STD-C34","阿特薩．星詠",1,"【……末日將會降臨】",[("SETTLE_PARITY_GAIN","奇數","1","金幣")])
-A("STD-C34","阿特薩．星詠",2,"【這命運是無法改變的！】",[("AFTER_ROLL_REMOVE_DICE","1")])
-A("STD-C35","嗚嘎",1,"【看書！】",[("TASK_BASE_DICE","[聰明]","3")])
-A("STD-C35","嗚嘎",2,"【看不懂！】",[("AFTER_ROLL_RESULT_MOD","[聰明]","-6")])
-A("STD-C36","「夜鶯」艾妲",1,"【今晚唱些老故事吧】",[("COST","橫置此冒險者"),("EFF_GAIN","完成區任務數×2","金幣")])
-A("STD-C36","「夜鶯」艾妲",2,"【這個也得寫進歌裡！】",[("NO_ROUND_RESET",),("SETTLE_IF_TAPPED_GAIN","1","金幣")])
-A("STD-C37","怪盜雞德",1,"【犯罪預告】",[("PREDICT_PARITY","3","金幣")])
-A("STD-C38","方庚",1,"【隨時警備】",[("NO_TAP_DISPATCH",)])
-A("STD-C38","方庚",2,"【今晚我請客】",[("SALARY_WAIVE_LOWER","[士兵]")])
-A("STD-C38","方庚",3,"【我該回家了】",[("TAP_SELF_IF_WAIVED","2")])
-A("STD-C39","方壬",1,"【依序辦理】",[("COMPLETE_IN_SLOT_GAIN","2","1","2")])
-A("STD-C40","「歧路觀測者」菲特",1,"【凡人之血】",[("COUNTS_AS_RACE","人類")])
-A("STD-C40","「歧路觀測者」菲特",2,"【如果當時……】",[("COST","橫置此冒險者"),("EFF_FLIP_DOUBLE_TEMP",)])
-A("STD-C41","「爆炸頭」傑米",1,"【嘗試配方】",[("COST","橫置此冒險者"),("EFF_ADD_TOKENS_SELF","3","精工")])
-A("STD-C41","「爆炸頭」傑米",2,"【別爆別爆別爆……】",[("TOKEN_PLACED_RISK","精工","1")])
-A("STD-C41","「爆炸頭」傑米",3,"【看我的傑作！】",[("COST","橫置此冒險者"),("EFF_CREATE_ITEM_MOVE_TOKENS","希氏炸藥","精工")])
-A("STD-C42","艾里克",1,"【最後的禱言】",[("ON_DESTROY_GAIN","非衍生物的","2")])
-A("STD-C42","艾里克",2,"【晨間禱告】",[("COST","橫置此冒險者"),("EFF_GAIN","1","聲望")])
-A("STD-C43","「金牙」古斯",1,"【我是在幫你們解決問題】",[("COMPLETE_GAIN","","-1","聲望")])
-A("STD-C43","「金牙」古斯",2,"【你跑不掉的】",[("BASE_DICE_CHOICE","0","4")])
-A("STD-C44","「修女」梅里妲",1,"【梅里妲的注視】",[("ON_RECRUIT_GIVE_ITEM","梅里妲的注視")])
-A("STD-C45","薩姆．火爪",1,"【野火蔓延】",[("ON_ANY_COMPLETE_TAG_ITEM","[火焰]／[森林]","火爪的信念／灰燼")],"[火焰] 為預留標籤")
-A("STD-C46","「賭徒」馬文",1,"【加注】",[("GAMBLE_REROLL","1","3","2")])
-A("STD-C47","學舌鳥",1,"【伶牙俐齒】",[("EFF_COPY_ABILITY",)],"特殊：觸發條件與代價寫在模板中")
-FROG={"STD-C48":("「青蛙合唱團」兜","【C大三和弦】","「青蛙合唱團」彌","「青蛙合唱團」梭",("AFTER_ROLL_AUTO_SUCCESS","1","[食材]")),
-      "STD-C49":("「青蛙合唱團」蕾","【Dm小三和弦】","「青蛙合唱團」法","「青蛙合唱團」菈",("TURNSTART_TASK_TIME","1","1")),
-      "STD-C50":("「青蛙合唱團」彌","【Em小三和弦】","「青蛙合唱團」梭","「青蛙合唱團」汐",("TURNSTART_CREATE_TOKEN","2","彌的粉絲")),
-      "STD-C51":("「青蛙合唱團」法","【F大三和弦】","「青蛙合唱團」菈","「青蛙合唱團」兜",("EXTRA_ITEM_SLOT","1")),
-      "STD-C52":("「青蛙合唱團」梭","【G大三和弦】","「青蛙合唱團」汐","「青蛙合唱團」蕾",("GUILD_UNTARGETABLE",)),
-      "STD-C53":("「青蛙合唱團」菈","【Am小三和弦】","「青蛙合唱團」兜","「青蛙合唱團」彌",("TARGET_COUNT_PLUS","1")),
-      "STD-C54":("「青蛙合唱團」汐","【Bdim減三和弦】","「青蛙合唱團」蕾","「青蛙合唱團」法",("SETTLE_RESET","你完成任務","1"))}
-for cid,(name,chord,x,y,eff) in FROG.items():
-    A(cid,name,1,"【共鳴】",[("FREE_RECRUIT_IF_NAME","青蛙合唱團")])
-    A(cid,name,2,chord,[("COND_HAS_CARDS",x,y),eff])
-A("STD-C55","凱菲",1,"【來點咖啡就好……】",[("DISPATCH_ADD_TOKEN_NO_TAP","1","疲勞"),("DICE_PER_TOKEN","疲勞","1")])
-A("STD-C55","凱菲",2,"【我先睡一下……】",[("TIMING","回合開始時"),("COST","橫置此冒險者"),("EFF_REMOVE_TOKENS_SELF","疲勞")])
-A("STD-C55","凱菲",3,"【……撐不住了】",[("TOKEN_THRESHOLD_FLIP","疲勞","5")])
-A("STD-C55B","「過勞死」凱菲",1,"【終於可以一直上班了！】",[("MUST_PARTICIPATE_FIRST",)])
-A("STD-C55B","「過勞死」凱菲",2,"【沒事得找事啊！】",[("TURNEND_IF_UPRIGHT_TAP_PAY","10")])
-A("STD-C55B","「過勞死」凱菲",3,"【我拒絕離職】",[("CANNOT_BE_FIRED",)])
-A("STD-C56","格芮絲",1,"【初級奧術飛彈】",[("WITH_PROFESSION_DICE","[巫師]","1")])
-A("STD-C57","瑞斯教授",1,"【空間傳送】",[("COST","橫置此冒險者"),("ADD_PARTICIPANT","1")])
-A("STD-C58","阿骨",1,"【我算一個人嗎？】",[("NOT_COUNT_CAPACITY",)])
-A("STD-C59","比爾．溫徹斯特",1,"【金色麥田】",[("TURNEND_GAIN_ITEM","","1","小麥")])
-A("STD-C59","比爾．溫徹斯特",2,"【辛勤耕作】",[("TURNEND_GAIN_ITEM","若此冒險者為直立狀態，額外","1","小麥")])
-A("STD-C60","漢克．溫徹斯特",1,"【農莊加工】",[("SELL_PRICE_MOD","[乳製品]／[農產品]","2")])
-A("STD-C60","漢克．溫徹斯特",2,"【農產加工】",[("COST","橫置此冒險者"),("EFF_CONVERT_ITEMS","2","[農產品]","漢克的貨品")])
-A("STD-C61","凱莉．溫徹斯特",1,"【牧場鮮乳】",[("TURNEND_GAIN_ITEM","","1","牛乳")])
-A("STD-C61","凱莉．溫徹斯特",2,"【牧場好朋友】",[("AFTER_ROLL_TURN","[動物]","1")],"[動物] 為預留標籤")
-# 衍生物
-BEEP=[("STD-T01","重拳小嗶","【重拳出擊！】",[("DICE_PER_TOKEN","精工","1")]),
-      ("STD-T02","飛天小嗶","【從天而降的掌法！】",[("COST","橫置此冒險者"),("EFF_TAP_BASE_DICE_BELOW","精工/2")]),
-      ("STD-T03","喀嘣小嗶","【BOOOOOOM！】",[("RESULT_ADJUST","精工")]),
-      ("STD-T04","偷偷摸摸小嗶","【塗黑黑！】",[("TASK_DIFFICULTY","[潛行]","精工/2")]),
-      ("STD-T05","守門員小嗶","【不可以過！】",[("GUARD_REDIRECT","精工")]),
-      ("STD-T06","狗狗小嗶","【咬去給他！】",[("COST","橫置此冒險者"),("EFF_TRANSFER_TOKENS_DESTROY","精工","機械")]),
-      ("STD-T07","小丑小嗶","【Surprise！】",[("SETTLE_RESET","包含此冒險者的任務結算","精工/2")]),
-      ("STD-T08","販賣機小嗶","【回收再利用！】",[("SETTLE_GAIN","精工","金幣")])]
-for cid,name,sname,cl in BEEP:
-    A(cid,name,1,"【精工】",[("ON_CREATE_TRANSFER_TOKENS","「天才」瑪絲珂","精工")])
-    A(cid,name,2,sname,cl)
-    A(cid,name,3,"【臨時機體】",[("ROUNDEND_DESTROY_SELF",)])
-A("STD-T09","彌的粉絲",1,"【是粉絲見面會♡！】",[("WITH_CARD_DICE","「青蛙合唱團」彌","1"),("WITH_CARD_GAIN","「青蛙合唱團」彌","3","金幣")])
-A("STD-T09","彌的粉絲",2,"【已滿足♡♡♡！】",[("WITH_CARD_DESTROY_AFTER","「青蛙合唱團」彌")])
-# 道具
-A("ITM-001","伊蓮娜的強壯藥劑",1,"功能",[("ITEM_CONSUME",),("EFF_BASE_DICE_ROUND","+2")])
-A("ITM-002","伊蓮娜的縮小藥劑",1,"功能",[("ITEM_CONSUME",),("EFF_BASE_DICE_ROUND","-2")])
-A("ITM-003","伊蓮娜的精力藥劑",1,"功能",[("ITEM_CONSUME",),("EFF_RESET","1")])
-A("ITM-004","紅斑菌菇",1,"功能",[("ITEM_CONSUME",),("EFF_BASE_DICE_ROUND","-1"),("EFF_NO_RESET_ROUND",)])
-A("ITM-007","父親的家書",1,"功能",[("WHILE_HELD_NO_TAP_FIRST","芙蕾雅．霜語")])
-A("（無編號）","《王座之側的荊棘玫瑰》",1,"功能",[("WHILE_HELD_BLOCK_OPTION","里諾【你好，我可以逮捕你嗎？】","2")],"尚未實裝，匯入時略過")
-A("ITM-008","戈拉古斯的手稿",1,"功能",[("REPLACE_DESTROY_UNIQUE_ITEM",)])
-A("ITM-009","希氏炸藥",1,"功能",[("ITEM_CONSUME",),("ITEM_TOKEN_TIER_RESULT",)])
-A("ITM-010","梅里妲的注視",1,"功能",[("ON_REP_DECREASE_DESTROY",)])
-A("ITM-011","火爪的信念",1,"功能",[("CONSUME_ALL_TIER_GAIN",)])
-A("ITM-015","漢克的貨品",1,"功能",[("SUBSTITUTE_ITEM","[農產品]／[乳製品]")])
-# 任務
-A("STD-M02","送錯的軍令",1,"特殊規則",[("TASK_AUTO_COMPLETE_TRAIT","[迅捷]")])
-A("EXP","諾特里堡壘之亂",1,"特殊規則",[("TASK_EPIC",)])
-A("EXP","諾特里堡壘之亂(B)",1,"特殊規則",[("TASK_DESTROY_PARTICIPANTS","2","[士兵]","1")])
+# 對照表由卡片資料管線維護（data/skill-mapping.csv），這裡只讀取，用來統計每個模板被哪些卡片使用。
+with open(os.path.join(ROOT, "data", "skill-mapping.csv"), encoding="utf-8-sig", newline="") as f:
+    _rows = list(csv.reader(f))[1:]
+M = [tuple(r[:5]) + (r[5], r[6], r[7], r[8], r[9] if len(r) > 9 else "") for r in _rows if len(r) > 5]
 
 T.append(("EFF_REMOVE_TOKENS_SELF","移除此冒險者的指示物","效果","移除此冒險者上的所有{X}指示物。","X＝指示物"))
 
@@ -291,10 +152,10 @@ unused = codes - set(used)
 assert not unused, unused
 
 os.makedirs(os.path.join(ROOT, "data"), exist_ok=True)
-with open(os.path.join(ROOT, "data", "skill-mapping.csv"), "w", encoding="utf-8-sig", newline="") as f:
-    w = csv.writer(f)
-    w.writerow(["卡片編號","卡片名稱","技能順序","技能名稱","子句","模板代碼","X","Y","Z","備註"])
-    w.writerows(M)
+import json
+with open(os.path.join(ROOT, "data", "skill-templates.json"), "w", encoding="utf-8") as f:
+    json.dump([{"code": c, "name": n, "type": t, "text": x, "params": p} for c, n, t, x, p in T], f, ensure_ascii=False, indent=2)
+    f.write("\n")
 
 TYPES = ["條件","代價","常駐","觸發","效果","關鍵字","特殊"]
 TYPE_DESC = {
