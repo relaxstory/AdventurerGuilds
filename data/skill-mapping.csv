@@ -182,7 +182,7 @@ ITM-004,紅斑菌菇,1,功能,1,ITEM_CONSUME,,,,
 ITM-004,紅斑菌菇,1,功能,2,EFF_BASE_DICE_ROUND,-1,,,
 ITM-004,紅斑菌菇,1,功能,3,EFF_NO_RESET_ROUND,,,,
 ITM-007,父親的家書,1,功能,1,WHILE_HELD_NO_TAP_FIRST,芙蕾雅．霜語,,,
-（無編號）,《王座之側的荊棘玫瑰》,1,功能,1,WHILE_HELD_BLOCK_OPTION,里諾【你好，我可以逮捕你嗎？】,2,,道具編號待補
+（無編號）,《王座之側的荊棘玫瑰》,1,功能,1,WHILE_HELD_BLOCK_OPTION,里諾【你好，我可以逮捕你嗎？】,2,,尚未實裝，匯入時略過
 ITM-008,戈拉古斯的手稿,1,功能,1,REPLACE_DESTROY_UNIQUE_ITEM,,,,
 ITM-009,希氏炸藥,1,功能,1,ITEM_CONSUME,,,,
 ITM-009,希氏炸藥,1,功能,2,ITEM_TOKEN_TIER_RESULT,,,,

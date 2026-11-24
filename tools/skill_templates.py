@@ -269,7 +269,7 @@ A("ITM-002","伊蓮娜的縮小藥劑",1,"功能",[("ITEM_CONSUME",),("EFF_BASE_
 A("ITM-003","伊蓮娜的精力藥劑",1,"功能",[("ITEM_CONSUME",),("EFF_RESET","1")])
 A("ITM-004","紅斑菌菇",1,"功能",[("ITEM_CONSUME",),("EFF_BASE_DICE_ROUND","-1"),("EFF_NO_RESET_ROUND",)])
 A("ITM-007","父親的家書",1,"功能",[("WHILE_HELD_NO_TAP_FIRST","芙蕾雅．霜語")])
-A("（無編號）","《王座之側的荊棘玫瑰》",1,"功能",[("WHILE_HELD_BLOCK_OPTION","里諾【你好，我可以逮捕你嗎？】","2")],"道具編號待補")
+A("（無編號）","《王座之側的荊棘玫瑰》",1,"功能",[("WHILE_HELD_BLOCK_OPTION","里諾【你好，我可以逮捕你嗎？】","2")],"尚未實裝，匯入時略過")
 A("ITM-008","戈拉古斯的手稿",1,"功能",[("REPLACE_DESTROY_UNIQUE_ITEM",)])
 A("ITM-009","希氏炸藥",1,"功能",[("ITEM_CONSUME",),("ITEM_TOKEN_TIER_RESULT",)])
 A("ITM-010","梅里妲的注視",1,"功能",[("ON_REP_DECREASE_DESTROY",)])
