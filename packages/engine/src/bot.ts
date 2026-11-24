@@ -3,6 +3,7 @@
  * 策略刻意保持單純，不代表最佳玩法。
  */
 import { adjustOptions, clauses, dispatchLimitProblem, mustDispatch, outcome, participants, participationProblem, salaryFor } from "./abilities.js";
+import { activatedSkills, activationImplemented } from "./activate.js";
 import { turnOptions } from "./dice.js";
 import { applyAction, baseDiceOf, stagingSlots, taskDef, upgradeCost, type Action, type ExpiryPenalty } from "./actions.js";
 import { RuleError } from "./errors.js";
@@ -96,10 +97,52 @@ function missionStep(state: GameState, lib: CardLibrary): Action {
   return { type: "resolve" };
 }
 
+/** 回應等待中的決定：能橫置就橫置價值最低的冒險者，否則選另一項。 */
+function botDecision(state: GameState, lib: CardLibrary): Action {
+  const pending = state.pending!;
+  const who = state.players.find((x) => x.id === pending.player)!;
+  if (pending.kind === "tapTarget") return { type: "decide", decision: { option: "tap", target: pending.targets[0]! } };
+  const upright = who.adventurers.filter((u) => !state.adventurerCards[u]!.tapped).sort((a, b) => value(state, lib, a) - value(state, lib, b));
+  if (upright.length) return { type: "decide", decision: { option: "tap", target: upright[0]! } };
+  return { type: "decide", decision: { option: pending.kind === "tapOrPay" ? "pay" : "flip" } };
+}
+
+/** 使用單純的主動能力：只獲得資源的能力、布魯斯與里諾、凱菲在回合開始時睡覺。 */
+function botActivation(state: GameState, lib: CardLibrary, timing: "start" | "end"): Action | null {
+  const p = currentPlayer(state);
+  const richest = state.players.filter((x) => x.id !== p.id).sort((a, b) => b.gold - a.gold)[0];
+  for (const uid of p.adventurers) {
+    const card = state.adventurerCards[uid]!;
+    for (const [skill, clauses] of activatedSkills(state, lib, uid)) {
+      if (!activationImplemented(clauses)) continue;
+      const cost = clauses.find((c) => c.code === "COST")!;
+      if (cost.x.includes("橫置") && card.tapped) continue;
+      if (Number(cost.y || 0) > p.gold - 2) continue;
+      const codes = clauses.map((c) => c.code).filter((c) => c !== "COST" && c !== "TIMING");
+      const isStart = clauses.some((c) => c.code === "TIMING" && c.x === "回合開始時");
+      if (timing === "start") {
+        if (isStart && codes.includes("EFF_REMOVE_TOKENS_SELF") && (card.tokens["疲勞"] ?? 0) >= 4) return { type: "activate", card: uid, skill };
+        continue;
+      }
+      if (isStart) continue;
+      if (codes.every((c) => c === "EFF_GAIN")) return { type: "activate", card: uid, skill };
+      if (richest && codes.length === 1 && (codes[0] === "EFF_OPPONENT_TAP_OR_PAY" || codes[0] === "EFF_OPPONENT_TAP_OR_FLIP")) {
+        return { type: "activate", card: uid, skill, player: richest.id };
+      }
+    }
+  }
+  return null;
+}
+
 export function botAction(state: GameState, lib: CardLibrary): Action {
+  if (state.pending) return botDecision(state, lib);
   const p = currentPlayer(state);
   switch (state.phase) {
     case "guild": {
+      if (state.turnStartOpen) {
+        const sleep = botActivation(state, lib, "start");
+        if (sleep) return sleep;
+      }
       if (p.actionsLeft < 1) return { type: "endGuildPhase" };
       const recruitIndex = bestTavernIndex(state, lib);
       if (p.adventurers.length < 3 && recruitIndex >= 0) return { type: "recruit", tavernIndex: recruitIndex };
@@ -132,7 +175,7 @@ export function botAction(state: GameState, lib: CardLibrary): Action {
         const party = chooseParty(state, lib, uid);
         if (party) return { type: "dispatch", task: uid, adventurers: party };
       }
-      return { type: "endAdventurePhase" };
+      return botActivation(state, lib, "end") ?? { type: "endAdventurePhase" };
     }
     case "cleanup": {
       const pending = state.pendingExpiry[0];
@@ -159,6 +202,7 @@ export function simulate(config: GameConfig, source: CardSource, maxSteps = 5000
     } catch (e) {
       // AI 選了不合法的操作：直接結束目前的階段
       if (!(e instanceof RuleError)) throw e;
+      if (state.pending) throw e;
       const fallback: Action = state.phase === "guild" ? { type: "endGuildPhase" } : state.phase === "adventure" ? { type: "endAdventurePhase" } : { type: "endTurn" };
       state = applyAction(state, fallback, lib);
     }

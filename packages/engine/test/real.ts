@@ -36,6 +36,22 @@ export function hire(state: GameState, ...defIds: string[]): string[] {
   });
 }
 
+/** 讓指定的玩家（依座位，0 起算）擁有冒險者，回傳 uid。 */
+export function hireFor(state: GameState, seat: number, ...defIds: string[]): string[] {
+  return defIds.map((defId) => {
+    const back = defId.endsWith("B");
+    const uid = `x${next++}`;
+    state.adventurerCards[uid] = { uid, defId: back ? defId.slice(0, -1) : defId, face: back ? "back" : "front", tapped: false, tokens: {} };
+    state.players[seat]!.adventurers.push(uid);
+    return uid;
+  });
+}
+
+/** 目前玩家以外的另一位玩家的座位。 */
+export function otherSeat(state: GameState): number {
+  return state.players.findIndex((p) => p.id !== currentPlayer(state).id);
+}
+
 /** 讓目前玩家的暫存格有指定的任務（卡片編號），回傳 uid。 */
 export function take(state: GameState, taskId: string): string {
   const uid = `y${next++}`;

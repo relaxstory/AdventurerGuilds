@@ -1,4 +1,5 @@
 import * as ab from "./abilities.js";
+import { activate, activatedSkills, decide, type ActivateParams, type Decision } from "./activate.js";
 import { RULES } from "./constants.js";
 import type { CardLibrary, TaskDef } from "./defs.js";
 import { RuleError } from "./errors.js";
@@ -23,6 +24,10 @@ export type Action =
   /** 派遣：調整完畢，計算結果並結算任務。 */
   | { readonly type: "resolve" }
   | { readonly type: "endAdventurePhase" }
+  /** 自己的回合：發動主動能力。 */
+  | ({ readonly type: "activate" } & ActivateParams)
+  /** 回應等待中的決定（由 state.pending.player 做出）。 */
+  | { readonly type: "decide"; readonly decision: Decision }
   /** 公會整理階段：逾期懲罰金幣與聲望都能付時，由玩家選擇。 */
   | { readonly type: "choosePenalty"; readonly task: string; readonly penalty: ExpiryPenalty }
   /** 公會整理階段：升級公會。 */
@@ -76,6 +81,15 @@ export function applyAction(prev: GameState, action: Action, lib: CardLibrary): 
   const need = (phase: GameState["phase"], label: string) => {
     if (state.phase !== phase) throw new RuleError(`現在不是${label}`);
   };
+  if (state.pending && action.type !== "decide") {
+    const who = state.players.find((x) => x.id === state.pending!.player)!;
+    throw new RuleError(`等待 ${who.name} 做決定`);
+  }
+  // 回合開始的時機：做了「回合開始時」能力以外的任何操作後就結束
+  const turnStartAction =
+    action.type === "activate" &&
+    (activatedSkills(state, lib, action.card).get(action.skill) ?? []).some((c) => c.code === "TIMING" && c.x === "回合開始時");
+  if (!turnStartAction) state.turnStartOpen = false;
 
   switch (action.type) {
     case "recruit": {
@@ -95,6 +109,7 @@ export function applyAction(prev: GameState, action: Action, lib: CardLibrary): 
         // 被解僱的冒險者放進被招募者原本的位置，不從牌庫補牌（docs/spec.md 6.2）
         state.tavern[action.tavernIndex] = fired;
         log(`招募 ${name}，解僱 ${adventurerFace(state, lib, fired).name}`);
+        ab.onReturnToTavern(state, lib, fired, p.id, log);
       } else {
         const counts = !ab.has(state, lib, uid, "NOT_COUNT_CAPACITY");
         if (counts && ab.capacityUsed(state, lib, p) >= RULES.adventurerCapacity) {
@@ -122,6 +137,16 @@ export function applyAction(prev: GameState, action: Action, lib: CardLibrary): 
       p.staging.push(uid);
       p.actionsLeft -= 1;
       log(`接取任務「${taskDef(state, lib, uid).name}」`);
+      break;
+    }
+
+    case "activate": {
+      activate(state, lib, rng, p, action, log);
+      break;
+    }
+
+    case "decide": {
+      decide(state, lib, action.decision, (player, text) => state.log.push({ round: state.round, player, text }));
       break;
     }
 
@@ -394,6 +419,7 @@ function endTurn(state: GameState, lib: CardLibrary, rng: Rng): void {
 
 function beginTurn(state: GameState): void {
   state.phase = "guild";
+  state.turnStartOpen = true;
   const p = currentPlayer(state);
   p.actionsLeft = RULES.guildActions;
   p.missionsThisTurn = 0;
@@ -413,7 +439,9 @@ function roundEnd(state: GameState, lib: CardLibrary, rng: Rng): void {
   state.board = Array.from({ length: RULES.boardSize }, () => state.taskDeck.shift() ?? null);
 
   // 6. 酒館：最前端 2 名移到棄置區，其餘往前補，再補滿
-  state.adventurerDiscard.push(...state.tavern.splice(0, RULES.tavernDropPerRound));
+  const dropped = state.tavern.splice(0, RULES.tavernDropPerRound);
+  for (const uid of dropped) state.adventurerCards[uid]!.tokens = {}; // 進入棄置區時移除指示物
+  state.adventurerDiscard.push(...dropped);
   while (state.tavern.length < RULES.tavernSize && state.adventurerDeck.length) state.tavern.push(state.adventurerDeck.shift()!);
 
   state.log.push({ round: state.round, player: null, text: `第 ${state.round} 輪結束` });

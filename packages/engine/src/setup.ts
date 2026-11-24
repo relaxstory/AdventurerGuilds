@@ -120,6 +120,8 @@ export function createGame(config: GameConfig, source: CardSource): GameState {
     board: [...board, ...Array<null>(RULES.boardSize - board.length).fill(null)],
     taskDiscard: [],
     honors: table,
+    pending: null,
+    turnStartOpen: true,
     mission: null,
     pendingExpiry: [],
     epicTried: [],

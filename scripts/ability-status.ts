@@ -18,20 +18,16 @@ for (const kind of ["adventurers", "derivatives", "items", "tasks"]) {
     if ((c.status === "實裝" || c.status === "測試") && !(c.type ?? "").startsWith("史詩")) active.add(`${c.id || "（無編號）"}｜${c.name}`);
   }
 }
-// 已排除的子句：COST、TIMING 是主動能力的一部分，隨主動能力一起實作
-const structural = new Set(["COST", "TIMING", "ITEM_CONSUME"]);
+// 需要消耗道具作為代價的主動能力，隨道具一起實作（以 COST+道具 標示）
 const byCard = new Map<string, { name: string; skills: Map<string, string[]> }>();
-for (const [id = "", name = "", , skill = "", , code = ""] of rows.filter((r) => r.length > 5)) {
+for (const [id = "", name = "", , skill = "", , code = "", , , z = ""] of rows.filter((r) => r.length > 5)) {
   const key = `${id}｜${name}`;
   if (!active.has(key)) continue;
   const card = byCard.get(key) ?? { name, skills: new Map() };
-  card.skills.set(skill, [...(card.skills.get(skill) ?? []), code]);
+  card.skills.set(skill, [...(card.skills.get(skill) ?? []), code === "COST" && z ? "COST+道具" : code]);
   byCard.set(key, card);
 }
-const skillDone = (codes: string[]) => {
-  const real = codes.filter((c) => !structural.has(c));
-  return real.length > 0 && real.every((c) => IMPLEMENTED.has(c)) && !codes.some((c) => structural.has(c));
-};
+const skillDone = (codes: string[]) => codes.length > 0 && codes.every((c) => IMPLEMENTED.has(c));
 let cardsDone = 0;
 let skillsDone = 0;
 let skillsTotal = 0;
@@ -49,7 +45,7 @@ for (const [key, card] of [...byCard].sort((a, b) => a[0].localeCompare(b[0]))) 
 }
 const used = new Set(rows.map((r) => r[5]));
 const tplDone = templates.filter((t) => used.has(t.code) && IMPLEMENTED.has(t.code)).length;
-const tplTotal = templates.filter((t) => used.has(t.code) && !structural.has(t.code)).length;
+const tplTotal = templates.filter((t) => used.has(t.code)).length;
 const out = [
   "# 能力實作進度",
   "",

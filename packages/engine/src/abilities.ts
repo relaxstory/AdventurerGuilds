@@ -24,6 +24,11 @@ export const IMPLEMENTED = new Set([
   // M3-2：需要玩家選擇的能力
   "PREDICT_PARITY", "BASE_DICE_CHOICE", "AFTER_ROLL_REROLL", "AFTER_ROLL_TURN", "AFTER_ROLL_REMOVE_DICE",
   "GAMBLE_REROLL", "RESULT_ADJUST",
+  // M3-3：主動能力、指定與保護、跨玩家選擇、翻面
+  "COST", "TIMING", "EFF_GAIN", "EFF_RESET", "EFF_FLIP_SELF", "EFF_RETRIEVE_TASK", "EFF_DISCARD_RECRUIT",
+  "EFF_OPPONENT_TAP_OR_PAY", "EFF_OPPONENT_TAP_OR_FLIP", "EFF_TAP_WITH_TRAIT", "EFF_ADD_TOKENS_SELF", "TOKEN_PLACED_RISK",
+  "EFF_REMOVE_TOKENS_SELF", "ADD_PARTICIPANT", "UNTARGETABLE_BY_TRAIT", "REDIRECT_TARGETING", "GUILD_UNTARGETABLE",
+  "TARGET_COUNT_PLUS", "ON_FLIP_TAP_FLIPPER", "ON_RETURN_TAVERN_FLIP", "ON_FLIP_RECRUIT_SELF",
 ]);
 
 type Log = (text: string) => void;
@@ -159,19 +164,111 @@ export function tapOnDispatch(state: GameState, lib: CardLibrary, uid: string, l
   return true;
 }
 
-export function addTokens(state: GameState, lib: CardLibrary, uid: string, token: string, n: number, log: Log): void {
+export function addTokens(state: GameState, lib: CardLibrary, uid: string, token: string, n: number, log: Log, rng?: Rng): void {
+  if (n <= 0) return;
   const card = state.adventurerCards[uid]!;
   card.tokens[token] = (card.tokens[token] ?? 0) + n;
   const name = faceOf(state, lib, uid).name;
   log(`${name} 放置 ${n} 個${token}指示物（共 ${card.tokens[token]} 個）`);
+  // 傑米【別爆別爆別爆……】：放上指示物時擲等量的骰子，骰出指定點數就移除所有指示物
+  for (const c of clauses(state, lib, uid, "TOKEN_PLACED_RISK")) {
+    if (c.x !== token || !rng) continue;
+    const dice = rng.rollDice(n);
+    const bad = amount(state, lib, uid, c.y);
+    if (dice.includes(bad)) {
+      delete card.tokens[token];
+      log(`${name} 擲出 ${dice.join("、")}，出現 ${bad}：移除所有${token}指示物`);
+      return;
+    }
+    log(`${name} 擲出 ${dice.join("、")}，沒有出現 ${bad}`);
+  }
   for (const c of clauses(state, lib, uid, "TOKEN_THRESHOLD_FLIP")) {
     if (c.x === token && card.tokens[token]! >= amount(state, lib, uid, c.y)) {
       card.tapped = true;
-      card.face = card.face === "front" ? "back" : "front";
       delete card.tokens[token];
-      log(`${name} 的${token}指示物達到 ${c.y} 個：橫置並翻面為 ${faceOf(state, lib, uid).name}`);
+      log(`${name} 的${token}指示物達到 ${c.y} 個：橫置並翻面`);
+      const owner = ownerOf(state, uid);
+      flip(state, lib, uid, owner?.id ?? null, log);
     }
   }
+}
+
+// ── 翻面 ──
+
+/** 雙面卡的另一面是否存在。 */
+export function canFlip(state: GameState, lib: CardLibrary, uid: string): boolean {
+  const card = state.adventurerCards[uid]!;
+  const other = card.face === "front" ? `${card.defId}B` : card.defId;
+  return lib.adventurers.has(other);
+}
+
+/**
+ * 翻面，並觸發新的一面的「當此冒險者被翻面時」效果。
+ * flipper 是使其翻面的玩家（狂人里諾、賴皮的勇者會用到）。
+ */
+export function flip(state: GameState, lib: CardLibrary, uid: string, flipper: string | null, log: Log): void {
+  if (!canFlip(state, lib, uid)) return;
+  const card = state.adventurerCards[uid]!;
+  card.face = card.face === "front" ? "back" : "front";
+  const name = faceOf(state, lib, uid).name;
+  log(`翻面為 ${name}`);
+  const owner = ownerOf(state, uid);
+  // 狂人里諾【我給過你機會了】：橫置使其翻面的玩家公會中的一名直立冒險者（由擁有者指定）
+  if (has(state, lib, uid, "ON_FLIP_TAP_FLIPPER") && owner && flipper) {
+    const target = state.players.find((p) => p.id === flipper);
+    const targets = (target?.adventurers ?? []).filter(
+      (u) => !state.adventurerCards[u]!.tapped && canTarget(state, lib, uid, owner.id, u),
+    );
+    if (targets.length) state.pending = { kind: "tapTarget", player: owner.id, source: uid, targets };
+    else log(`${name} 沒有可以指定的目標，沒有效果`);
+  }
+  // 賴皮的勇者【賴著不走】：在酒館被翻面時，使其翻面的玩家立即額外招募他
+  if (has(state, lib, uid, "ON_FLIP_RECRUIT_SELF") && !owner && flipper) {
+    const i = state.tavern.indexOf(uid);
+    const p = state.players.find((x) => x.id === flipper);
+    if (i >= 0 && p) {
+      state.tavern.splice(i, 1);
+      const next = state.adventurerDeck.shift();
+      if (next) state.tavern.push(next);
+      p.adventurers.push(uid);
+      log(`${name} 賴著不走，被額外招募回公會`);
+    }
+  }
+}
+
+/** 冒險者被放回酒館時（勇者【卸甲歸田】）。flipper 為使其回到酒館的玩家。 */
+export function onReturnToTavern(state: GameState, lib: CardLibrary, uid: string, by: string, log: Log): void {
+  if (has(state, lib, uid, "ON_RETURN_TAVERN_FLIP")) {
+    log(`${faceOf(state, lib, uid).name} 回到酒館`);
+    flip(state, lib, uid, by, log);
+  }
+}
+
+// ── 指定與保護（docs/spec.md 13A.3）──
+
+/**
+ * source 冒險者（由 actor 控制）的能力能否指定 target。
+ * 限制優先：只要有任何一個「不能」，就不能指定。
+ */
+export function canTarget(state: GameState, lib: CardLibrary, source: string, actor: string, target: string): boolean {
+  const owner = ownerOf(state, target);
+  if (!owner) return false; // 只能指定公會中的冒險者，不含酒館
+  const sourceTraits = faceOf(state, lib, source).traits.map(bare);
+  // 暗影【狡兔三窟】：無法被具有特定特質的冒險者能力指定
+  for (const c of clauses(state, lib, target, "UNTARGETABLE_BY_TRAIT")) if (sourceTraits.includes(bare(c.x))) return false;
+  if (owner.id !== actor) {
+    // 梭的和弦：其他玩家的能力無法指定你公會中的冒險者
+    if (owner.adventurers.some((u) => has(state, lib, u, "GUILD_UNTARGETABLE"))) return false;
+    // 威利：其他玩家只能指定布魯斯與威利
+    const guard = owner.adventurers.find((u) => has(state, lib, u, "REDIRECT_TARGETING"));
+    if (guard && guard !== target) return false;
+  }
+  return true;
+}
+
+/** 你的冒險者能力中，指定冒險者的數量加成（菈的和弦）。 */
+export function targetBonus(state: GameState, lib: CardLibrary, p: PlayerState): number {
+  return p.adventurers.reduce((s, u) => s + clauses(state, lib, u, "TARGET_COUNT_PLUS").reduce((t, c) => t + amount(state, lib, u, c.x), 0), 0);
 }
 
 /** 隊伍中不能一起參與的組合（馬克【一朝被蛇咬】）。 */

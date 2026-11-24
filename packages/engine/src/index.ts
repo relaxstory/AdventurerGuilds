@@ -28,3 +28,5 @@ export {
   type AdjustOption,
   type RollChoices,
 } from "./abilities.js";
+export { activate, activatedSkills, activationImplemented, decide, type ActivateParams, type Decision } from "./activate.js";
+export { canTarget } from "./abilities.js";

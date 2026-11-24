@@ -96,6 +96,18 @@ export interface PlayerState {
 
 export type Phase = "guild" | "adventure" | "cleanup" | "gameOver";
 
+/**
+ * 等待某位玩家做決定（docs/spec.md 13A.5）。決定之前，其他操作都會被擋下。
+ * player 是要做決定的玩家，不一定是目前回合的玩家。
+ */
+export type Pending =
+  /** 布魯斯【布魯斯！】：橫置自己公會中的一名直立冒險者，或支付 amount 金幣給 from。 */
+  | { readonly kind: "tapOrPay"; readonly player: string; readonly from: string; readonly amount: number; readonly source: string }
+  /** 里諾【你好，我可以逮捕你嗎？】：橫置自己公會中的一名直立冒險者，或將 source 翻面。 */
+  | { readonly kind: "tapOrFlip"; readonly player: string; readonly from: string; readonly source: string }
+  /** 狂人里諾【我給過你機會了】：從 targets 中選一名冒險者橫置。 */
+  | { readonly kind: "tapTarget"; readonly player: string; readonly source: string; readonly targets: readonly string[] };
+
 export interface LogEntry {
   readonly round: number;
   readonly player: string | null;
@@ -136,6 +148,10 @@ export interface GameState {
   taskDiscard: string[];
   /** 本局使用的王國榮譽卡。 */
   honors: string[];
+  /** 等待某位玩家做決定。 */
+  pending: Pending | null;
+  /** 回合開始的時機：回合開始後、做任何其他操作之前（凱菲【我先睡一下……】）。 */
+  turnStartOpen: boolean;
   /** 冒險階段：進行中的派遣。 */
   mission: Mission | null;
   /** 公會整理階段：還沒處理的逾期任務（遇到需要玩家選擇懲罰的任務時停下）。 */
