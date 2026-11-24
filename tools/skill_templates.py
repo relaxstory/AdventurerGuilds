@@ -313,7 +313,8 @@ lines = []
 L = lines.append
 L("# 技能模板清單 v1\n")
 L("> 由 `tools/skill_templates.py` 產生，請勿直接編輯本檔。")
-L("> 每張卡的模板與參數見 `data/skill-mapping.csv`。\n")
+L("> 每張卡的模板與參數見 `data/skill-mapping.csv`。")
+L("> 本清單與對照表由 Claude 維護，設計者**不需要**在試算表填寫模板代碼（見 `docs/digital-spec.md` 第 7 節）。\n")
 L("## 設計說明\n")
 L("- 每個技能拆成一個或多個**子句**，每個子句對應一個模板。例如富豪巴克的【坐著數錢就好】＝ `NO_ROUND_RESET` ＋ `ROUNDEND_IF_TAPPED_GAIN`。")
 L("- **主動能力**＝ `COST`（代價）子句＋一個或多個效果子句。")

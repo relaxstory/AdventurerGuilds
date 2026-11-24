@@ -2,6 +2,7 @@
 
 > 由 `tools/skill_templates.py` 產生，請勿直接編輯本檔。
 > 每張卡的模板與參數見 `data/skill-mapping.csv`。
+> 本清單與對照表由 Claude 維護，設計者**不需要**在試算表填寫模板代碼（見 `docs/digital-spec.md` 第 7 節）。
 
 ## 設計說明
 
