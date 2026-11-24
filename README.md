@@ -7,3 +7,4 @@
 - [卡片文字修改清單](docs/card-changes.md)
 - [線上版功能規格](docs/digital-spec.md)
 - [技能模板清單](docs/skill-templates.md)
+- [任務難度參考](docs/task-difficulty.md)
