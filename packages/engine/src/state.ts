@@ -46,6 +46,18 @@ export interface Mission {
   pool: number;
   /** 因能力移除的骰子數，依冒險者 uid 記錄（莎莉【應該也不算太差？】）。 */
   removedBy: Record<string, number>;
+  /** 擲骰前的預言（怪盜雞德）：uid → 奇數或偶數。 */
+  predictions: Record<string, "odd" | "even">;
+  /** 自選的基礎骰數（古斯）：uid → 骰數。 */
+  baseDice: Record<string, number>;
+  /** 擲骰後能力的使用紀錄：`${uid}:${模板代碼}` → 已使用次數。 */
+  used: Record<string, number>;
+  /** 每張卡已經轉動過的骰子（以骰子編號記錄，每顆各 1 次）。 */
+  turned: Record<string, number[]>;
+  /** 結果值的調整（喀嘣小嗶）。 */
+  resultDelta: number;
+  /** 馬文【加注】：加注時任務是否已經成功、重擲了幾顆。 */
+  gamble: { uid: string; count: number; successBefore: boolean } | null;
 }
 
 export interface TaskCard {

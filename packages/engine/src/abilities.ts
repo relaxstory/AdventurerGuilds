@@ -5,6 +5,9 @@
  * 觸發效果在規則流程的固定時機呼叫（例如任務結算時）。
  */
 import type { ClauseDef, CardLibrary, TaskDef } from "./defs.js";
+import { turnOptions } from "./dice.js";
+import { RuleError } from "./errors.js";
+import type { Rng } from "./rng.js";
 import type { GameState, Mission, PlayerState } from "./state.js";
 
 /** 已實作的技能模板。其餘模板在對應的開發批次完成（docs/development.md）。 */
@@ -18,6 +21,9 @@ export const IMPLEMENTED = new Set([
   "PARTICIPATE_GAIN", "WITH_CARD_GAIN", "COMPLETE_GAIN", "SETTLE_PARITY_GAIN", "SETTLE_IF_TAPPED_GAIN", "SETTLE_GAIN",
   "COMPLETE_IN_SLOT_GAIN", "SALARY_WAIVE_LOWER", "TAP_SELF_IF_WAIVED",
   "ROUNDEND_IF_TAPPED_GAIN", "ROUNDEND_IF_UPRIGHT_TOKEN", "TURNEND_IF_UPRIGHT_TAP_PAY", "ON_RECRUIT_GAIN",
+  // M3-2：需要玩家選擇的能力
+  "PREDICT_PARITY", "BASE_DICE_CHOICE", "AFTER_ROLL_REROLL", "AFTER_ROLL_TURN", "AFTER_ROLL_REMOVE_DICE",
+  "GAMBLE_REROLL", "RESULT_ADJUST",
 ]);
 
 type Log = (text: string) => void;
@@ -227,7 +233,7 @@ export function dicePool(state: GameState, lib: CardLibrary, m: Mission, def: Ta
   const attempts = state.taskCards[m.task]!.attempts;
   let total = 0;
   for (const uid of party) {
-    let base = Math.max(0, faceOf(state, lib, uid).baseDice ?? 0);
+    let base = m.baseDice[uid] ?? Math.max(0, faceOf(state, lib, uid).baseDice ?? 0);
     for (const c of clauses(state, lib, uid, "TASK_BASE_DICE")) if (taskMatches(c.x, def, attempts)) base += amount(state, lib, uid, c.y);
     let dice = Math.max(0, base);
     for (const c of clauses(state, lib, uid, "DICE_PER_TOKEN")) dice += amount(state, lib, uid, c.x) * amount(state, lib, uid, c.y);
@@ -359,4 +365,194 @@ export function onRoundEnd(state: GameState, lib: CardLibrary, log: (player: Pla
 /** 輪末結算第 2 步：是否重置。 */
 export function resetsAtRoundEnd(state: GameState, lib: CardLibrary, uid: string): boolean {
   return !has(state, lib, uid, "NO_ROUND_RESET");
+}
+
+// ── M3-2：擲骰前的選擇 ──
+
+export interface RollChoices {
+  /** 怪盜雞德【犯罪預告】：uid → 預言結果值為奇數或偶數。 */
+  readonly predictions?: Readonly<Record<string, "odd" | "even">>;
+  /** 古斯【你跑不掉的】：uid → 本次的基礎骰數。 */
+  readonly baseDice?: Readonly<Record<string, number>>;
+}
+
+/** 套用擲骰前的選擇，並檢查必要的選擇是否都已提供。 */
+export function applyRollChoices(state: GameState, lib: CardLibrary, m: Mission, choices: RollChoices): void {
+  const party = participants(m);
+  for (const uid of party) {
+    const name = faceOf(state, lib, uid).name;
+    if (has(state, lib, uid, "PREDICT_PARITY")) {
+      const p = choices.predictions?.[uid];
+      if (p !== "odd" && p !== "even") throw new RuleError(`${name} 需要在擲骰前預言結果值為奇數或偶數`);
+      m.predictions[uid] = p;
+    }
+    const range = clauses(state, lib, uid, "BASE_DICE_CHOICE")[0];
+    const chosen = choices.baseDice?.[uid];
+    if (chosen !== undefined) {
+      if (!range) throw new RuleError(`${name} 不能自選基礎骰數`);
+      const lo = amount(state, lib, uid, range.x);
+      const hi = amount(state, lib, uid, range.y);
+      if (!Number.isInteger(chosen) || chosen < lo || chosen > hi) throw new RuleError(`${name} 的基礎骰數只能是 ${lo}～${hi}`);
+      m.baseDice[uid] = chosen;
+    }
+  }
+}
+
+// ── M3-2：擲骰後的調整 ──
+
+export type Adjustment =
+  /** 瓦雷諾【老兵】：重擲指定的骰子（骰子編號，0 起算）。 */
+  | { readonly kind: "reroll"; readonly card: string; readonly dice: readonly number[] }
+  /** 羅德教授、阿絲特拉、凱莉：把一顆骰子轉到相鄰的面。 */
+  | { readonly kind: "turn"; readonly card: string; readonly die: number; readonly face: number }
+  /** 阿特薩【這命運是無法改變的！】：移除一顆骰子（強制）。 */
+  | { readonly kind: "remove"; readonly card: string; readonly die: number }
+  /** 馬文【加注】：重擲點數最大（至少 X）或最小（至多 X）的 count 顆骰子。 */
+  | { readonly kind: "gamble"; readonly card: string; readonly count: number }
+  /** 喀嘣小嗶：結果值調整 delta。 */
+  | { readonly kind: "adjustResult"; readonly card: string; readonly delta: number };
+
+const ADJUST_CODE: Record<Adjustment["kind"], string> = {
+  reroll: "AFTER_ROLL_REROLL",
+  turn: "AFTER_ROLL_TURN",
+  remove: "AFTER_ROLL_REMOVE_DICE",
+  gamble: "GAMBLE_REROLL",
+  adjustResult: "RESULT_ADJUST",
+};
+
+export interface AdjustOption {
+  readonly card: string;
+  readonly kind: Adjustment["kind"];
+  /** 還可以使用的量：重擲／轉動／移除的骰子數，或結果值調整的上限。 */
+  readonly remaining: number;
+  readonly mandatory: boolean;
+}
+
+const useKey = (uid: string, code: string) => `${uid}:${code}`;
+
+/** 目前可以使用的擲骰後能力。 */
+export function adjustOptions(state: GameState, lib: CardLibrary, m: Mission): AdjustOption[] {
+  if (m.stage !== "adjust") return [];
+  const def = lib.task(state.taskCards[m.task]!.defKey);
+  const attempts = state.taskCards[m.task]!.attempts;
+  const out: AdjustOption[] = [];
+  for (const uid of participants(m)) {
+    const used = (code: string) => m.used[useKey(uid, code)] ?? 0;
+    for (const c of clauses(state, lib, uid, "AFTER_ROLL_REROLL")) {
+      if (taskMatches(c.x, def, attempts) && !used(c.code)) out.push({ card: uid, kind: "reroll", remaining: amount(state, lib, uid, c.y), mandatory: false });
+    }
+    for (const c of clauses(state, lib, uid, "AFTER_ROLL_TURN")) {
+      const left = amount(state, lib, uid, c.y) - (m.turned[uid]?.length ?? 0);
+      if (taskMatches(c.x, def, attempts) && left > 0) out.push({ card: uid, kind: "turn", remaining: left, mandatory: false });
+    }
+    for (const c of clauses(state, lib, uid, "AFTER_ROLL_REMOVE_DICE")) {
+      const left = Math.min(amount(state, lib, uid, c.x) - used(c.code), m.dice.length);
+      if (left > 0) out.push({ card: uid, kind: "remove", remaining: left, mandatory: true });
+    }
+    for (const c of clauses(state, lib, uid, "GAMBLE_REROLL")) {
+      if (!used(c.code) && def.condition && def.condition.op !== "between") {
+        out.push({ card: uid, kind: "gamble", remaining: Math.min(amount(state, lib, uid, c.y), m.dice.length), mandatory: false });
+      }
+    }
+    for (const c of clauses(state, lib, uid, "RESULT_ADJUST")) {
+      if (!used(c.code)) out.push({ card: uid, kind: "adjustResult", remaining: amount(state, lib, uid, c.x), mandatory: false });
+    }
+  }
+  return out;
+}
+
+export function applyAdjustment(state: GameState, lib: CardLibrary, rng: Rng, m: Mission, adj: Adjustment, log: (text: string, dice?: number[]) => void): void {
+  const option = adjustOptions(state, lib, m).find((o) => o.card === adj.card && o.kind === adj.kind);
+  const name = faceOf(state, lib, adj.card).name;
+  if (!option) throw new RuleError(`${name} 現在不能使用這個能力`);
+  const code = ADJUST_CODE[adj.kind];
+  const clause = clauses(state, lib, adj.card, code)[0]!;
+  const key = useKey(adj.card, code);
+  const checkDie = (i: number) => {
+    if (!Number.isInteger(i) || i < 0 || i >= m.dice.length) throw new RuleError("沒有這顆骰子");
+  };
+  switch (adj.kind) {
+    case "reroll": {
+      if (!adj.dice.length || adj.dice.length > option.remaining) throw new RuleError(`最多重擲 ${option.remaining} 顆骰子`);
+      if (new Set(adj.dice).size !== adj.dice.length) throw new RuleError("同一顆骰子不能重擲兩次");
+      adj.dice.forEach(checkDie);
+      for (const i of adj.dice) m.dice[i] = rng.d6();
+      m.used[key] = 1;
+      log(`${name}：重擲 ${adj.dice.length} 顆骰子`, [...m.dice]);
+      break;
+    }
+    case "turn": {
+      checkDie(adj.die);
+      if ((m.turned[adj.card] ?? []).includes(adj.die)) throw new RuleError("每顆骰子只能轉動 1 次");
+      const from = m.dice[adj.die]!;
+      if (!turnOptions(from).includes(adj.face)) throw new RuleError(`點數 ${from} 只能轉成 ${turnOptions(from).join("、")}`);
+      m.dice[adj.die] = adj.face;
+      m.turned[adj.card] = [...(m.turned[adj.card] ?? []), adj.die];
+      log(`${name}：把 ${from} 轉成 ${adj.face}`, [...m.dice]);
+      break;
+    }
+    case "remove": {
+      checkDie(adj.die);
+      const [face] = m.dice.splice(adj.die, 1);
+      m.used[key] = (m.used[key] ?? 0) + 1;
+      m.removedBy[adj.card] = (m.removedBy[adj.card] ?? 0) + 1;
+      log(`${name}：移除一顆點數 ${face} 的骰子`, [...m.dice]);
+      break;
+    }
+    case "gamble": {
+      const lo = amount(state, lib, adj.card, clause.x);
+      if (!Number.isInteger(adj.count) || adj.count < lo || adj.count > option.remaining) throw new RuleError(`加注只能重擲 ${lo}～${option.remaining} 顆骰子`);
+      const def = lib.task(state.taskCards[m.task]!.defKey);
+      const successBefore = outcome(state, lib, m).success;
+      // 至少 X：重擲點數最大的；至多 X：重擲點數最小的
+      const order = m.dice.map((d, i) => ({ d, i })).sort((a, b) => (def.condition!.op === "atLeast" ? b.d - a.d : a.d - b.d));
+      for (const { i } of order.slice(0, adj.count)) m.dice[i] = rng.d6();
+      m.used[key] = 1;
+      m.gamble = { uid: adj.card, count: adj.count, successBefore };
+      log(`${name}【加注】：重擲 ${adj.count} 顆骰子`, [...m.dice]);
+      break;
+    }
+    case "adjustResult": {
+      if (!Number.isInteger(adj.delta) || Math.abs(adj.delta) > option.remaining) throw new RuleError(`結果值最多調整 ±${option.remaining}`);
+      m.resultDelta += adj.delta;
+      m.used[key] = 1;
+      log(`${name}：結果值 ${adj.delta >= 0 ? "+" : ""}${adj.delta}`);
+      break;
+    }
+  }
+}
+
+/** 強制的擲骰後能力還沒處理完時，回傳提示訊息。 */
+export function pendingMandatory(state: GameState, lib: CardLibrary, m: Mission): string | null {
+  const o = adjustOptions(state, lib, m).find((x) => x.mandatory);
+  return o ? `${faceOf(state, lib, o.card).name} 必須先移除 ${o.remaining} 顆骰子` : null;
+}
+
+/** 目前的結果值、難度調整與成敗。 */
+export function outcome(state: GameState, lib: CardLibrary, m: Mission): { faceSum: number; result: number; n: number; success: boolean } {
+  const def = lib.task(state.taskCards[m.task]!.defKey);
+  const c = def.condition!;
+  const faceSum = m.dice.reduce((a, b) => a + b, 0);
+  const result = faceSum + resultModifier(state, lib, m, def) + m.resultDelta;
+  const n = difficulty(state, lib, m, def);
+  // 區間條件由玩家分配難度調整到兩端，等同於結果落在 [X−n, Y+n] 內即可
+  const success =
+    c.op === "atLeast" ? result >= c.x - n : c.op === "atMost" ? result <= c.x + n : result >= c.x - n && result <= c.y + n;
+  return { faceSum, result, n, success };
+}
+
+/** 預言與加注的結算。 */
+export function onSettleChoices(state: GameState, lib: CardLibrary, p: PlayerState, m: Mission, result: number, success: boolean, log: Log): void {
+  for (const [uid, guess] of Object.entries(m.predictions)) {
+    const name = faceOf(state, lib, uid).name;
+    const actual = Math.abs(result) % 2 === 0 ? "even" : "odd";
+    for (const c of clauses(state, lib, uid, "PREDICT_PARITY")) {
+      if (guess === actual) gain(p, amount(state, lib, uid, c.x), c.y, log, `${name} 預言正確`);
+      else log(`${name} 預言錯誤`);
+    }
+  }
+  if (m.gamble && success && m.gamble.successBefore) {
+    const c = clauses(state, lib, m.gamble.uid, "GAMBLE_REROLL")[0];
+    if (c) gain(p, m.gamble.count * amount(state, lib, m.gamble.uid, c.z), "金幣", log, `${faceOf(state, lib, m.gamble.uid).name}【加注】成功`);
+  }
 }

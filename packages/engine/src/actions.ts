@@ -16,8 +16,10 @@ export type Action =
   | { readonly type: "endGuildPhase" }
   /** 冒險階段：派遣冒險者執行任務（支付薪資、橫置），進入組隊步驟。 */
   | { readonly type: "dispatch"; readonly task: string; readonly adventurers: readonly string[] }
-  /** 派遣：隊伍確定，建立骰池並擲骰，進入調整步驟。 */
-  | { readonly type: "roll" }
+  /** 派遣：隊伍確定，套用擲骰前的選擇，建立骰池並擲骰，進入調整步驟。 */
+  | ({ readonly type: "roll" } & ab.RollChoices)
+  /** 派遣：使用擲骰後的能力（重擲、轉動、移除、加注、調整結果值）。 */
+  | { readonly type: "adjust"; readonly adjustment: ab.Adjustment }
   /** 派遣：調整完畢，計算結果並結算任務。 */
   | { readonly type: "resolve" }
   | { readonly type: "endAdventurePhase" }
@@ -137,7 +139,14 @@ export function applyAction(prev: GameState, action: Action, lib: CardLibrary): 
 
     case "roll": {
       const m = requireMission(state, "assemble");
+      ab.applyRollChoices(state, lib, m, action);
       rollMission(state, lib, rng, p, m, log);
+      break;
+    }
+
+    case "adjust": {
+      const m = requireMission(state, "adjust");
+      ab.applyAdjustment(state, lib, rng, m, action.adjustment, log);
       break;
     }
 
@@ -235,7 +244,10 @@ function startMission(state: GameState, lib: CardLibrary, p: PlayerState, taskUi
   p.missionsThisTurn += 1;
   const names = party.map((uid) => adventurerFace(state, lib, uid).name).join("、");
   log(`派遣 ${names} 執行「${def.name}」，支付薪資 ${salary} 金`);
-  state.mission = { task: taskUid, dispatched: [...party], joined: [], salary, stage: "assemble", dice: [], pool: 0, removedBy: {} };
+  state.mission = {
+    task: taskUid, dispatched: [...party], joined: [], salary, stage: "assemble", dice: [], pool: 0, removedBy: {},
+    predictions: {}, baseDice: {}, used: {}, turned: {}, resultDelta: 0, gamble: null,
+  };
 }
 
 /** 隊伍確定：參與時的效果、建立骰池、擲骰、擲骰後的強制效果。 */
@@ -251,16 +263,13 @@ function rollMission(state: GameState, lib: CardLibrary, rng: Rng, p: PlayerStat
 
 /** 計算結果值、套用難度調整、判定與結算（docs/spec.md 7.4）。 */
 function resolveMission(state: GameState, lib: CardLibrary, p: PlayerState, m: NonNullable<GameState["mission"]>, log: (text: string, dice?: number[]) => void): void {
+  const pending = ab.pendingMandatory(state, lib, m);
+  if (pending) throw new RuleError(pending);
   const taskUid = m.task;
   const def = taskDef(state, lib, taskUid);
   const c = def.condition!;
   const card = state.taskCards[taskUid]!;
-  const faceSum = m.dice.reduce((a, b) => a + b, 0);
-  const result = faceSum + ab.resultModifier(state, lib, m, def);
-  const n = ab.difficulty(state, lib, m, def);
-  // 區間條件由玩家分配難度調整到兩端，等同於結果落在 [X−n, Y+n] 內即可
-  const success =
-    c.op === "atLeast" ? result >= c.x - n : c.op === "atMost" ? result <= c.x + n : result >= c.x - n && result <= c.y + n;
+  const { faceSum, result, n, success } = ab.outcome(state, lib, m);
   const slotEntry = p.formal.find((f) => f.uid === taskUid);
   const slot = slotEntry ? slotEntry.timer : null;
   const emptyBefore = new Set([1, 2, 3].filter((t) => !p.formal.some((f) => f.timer === t && f.uid !== taskUid)));
@@ -280,6 +289,7 @@ function resolveMission(state: GameState, lib: CardLibrary, p: PlayerState, m: N
     log(`「${def.name}」結果值 ${result}，目標 ${condText}${adjText}：失敗`, [...m.dice]);
   }
   ab.onSettle(state, lib, p, m, def, { success, faceSum, slot, emptyBefore, waivedBy: ab.salaryFor(state, lib, m.dispatched).waivedBy }, log);
+  ab.onSettleChoices(state, lib, p, m, result, success, log);
 
   if (success) {
     card.attempts = 0;

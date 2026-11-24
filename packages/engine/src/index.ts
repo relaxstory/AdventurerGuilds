@@ -19,3 +19,12 @@ export {
 } from "./actions.js";
 export { scoreGame, HONOR_RULES } from "./honors.js";
 export { botAction, simulate } from "./bot.js";
+export {
+  adjustOptions,
+  outcome,
+  participants,
+  IMPLEMENTED,
+  type Adjustment,
+  type AdjustOption,
+  type RollChoices,
+} from "./abilities.js";

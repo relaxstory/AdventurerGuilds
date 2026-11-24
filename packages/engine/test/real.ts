@@ -46,7 +46,7 @@ export function take(state: GameState, taskId: string): string {
 }
 
 export function mission(task: string, dispatched: string[], joined: string[] = []): Mission {
-  return { task, dispatched, joined, salary: 0, stage: "assemble", dice: [], pool: 0, removedBy: {} };
+  return { task, dispatched, joined, salary: 0, stage: "assemble", dice: [], pool: 0, removedBy: {}, predictions: {}, baseDice: {}, used: {}, turned: {}, resultDelta: 0, gamble: null };
 }
 
 export const run = (state: GameState, lib: CardLibrary, ...actions: Action[]) => actions.reduce((s, a) => applyAction(s, a, lib), state);

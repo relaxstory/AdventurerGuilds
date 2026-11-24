@@ -62,7 +62,7 @@
 | 階段 | 操作 |
 |---|---|
 | 公會階段 | `recruit`（招募，可指定解僱對象）、`acceptTask`（接任務）、`endGuildPhase` |
-| 冒險階段 | `dispatch`（選任務與冒險者、支付薪資、橫置）→ `roll`（建立骰池、擲骰）→ `resolve`（計算結果、判定、結算）；`endAdventurePhase`（進入整理階段，自動處理時限與逾期） |
+| 冒險階段 | `dispatch`（選任務與冒險者、支付薪資、橫置）→ `roll`（擲骰前的選擇：預言、自選骰數；建立骰池、擲骰）→ `adjust`（擲骰後的能力：重擲、轉動、移除、加注、調整結果值，可使用多次）→ `resolve`（計算結果、判定、結算）；`endAdventurePhase`（進入整理階段，自動處理時限與逾期） |
 | 公會整理階段 | `choosePenalty`（逾期懲罰需要選擇時）、`upgrade`（升級公會）、`endTurn` |
 
 能力的實作進度見 `docs/ability-status.md`（`npm run abilities` 產生）。史詩任務暫時排除。

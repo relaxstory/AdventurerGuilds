@@ -2,7 +2,8 @@
  * 簡單的 AI 玩家：用來自動跑完整局、驗證規則與做平衡模擬。
  * 策略刻意保持單純，不代表最佳玩法。
  */
-import { mustDispatch, participationProblem, salaryFor } from "./abilities.js";
+import { adjustOptions, clauses, mustDispatch, outcome, participants, participationProblem, salaryFor } from "./abilities.js";
+import { turnOptions } from "./dice.js";
 import { applyAction, baseDiceOf, stagingSlots, taskDef, upgradeCost, type Action, type ExpiryPenalty } from "./actions.js";
 import { RuleError } from "./errors.js";
 import type { CardLibrary, CardSource } from "./defs.js";
@@ -55,6 +56,46 @@ function chooseParty(state: GameState, lib: CardLibrary, taskUid: string): strin
   return party;
 }
 
+/** 進行中的派遣：擲骰前的選擇、擲骰後的調整。 */
+function missionStep(state: GameState, lib: CardLibrary): Action {
+  const m = state.mission!;
+  const def = taskDef(state, lib, m.task);
+  const op = def.condition!.op;
+  if (m.stage === "assemble") {
+    const predictions: Record<string, "odd" | "even"> = {};
+    const baseDice: Record<string, number> = {};
+    for (const uid of participants(m)) {
+      if (clauses(state, lib, uid, "PREDICT_PARITY").length) predictions[uid] = "even";
+      const range = clauses(state, lib, uid, "BASE_DICE_CHOICE")[0];
+      if (range) baseDice[uid] = op === "atMost" ? Number(range.x) : Number(range.y);
+    }
+    return { type: "roll", predictions, baseDice };
+  }
+  const options = adjustOptions(state, lib, m);
+  const lowest = () => m.dice.indexOf(Math.min(...m.dice));
+  const highest = () => m.dice.indexOf(Math.max(...m.dice));
+  const remove = options.find((o) => o.kind === "remove");
+  if (remove) return { type: "adjust", adjustment: { kind: "remove", card: remove.card, die: op === "atMost" ? highest() : lowest() } };
+  if (!outcome(state, lib, m).success) {
+    const turn = options.find((o) => o.kind === "turn");
+    if (turn) {
+      const done = m.turned[turn.card] ?? [];
+      const candidates = m.dice.map((d, i) => ({ d, i })).filter(({ i }) => !done.includes(i));
+      const pick = op === "atMost" ? candidates.sort((a, b) => b.d - a.d)[0] : candidates.sort((a, b) => a.d - b.d)[0];
+      if (pick) {
+        const faces = turnOptions(pick.d);
+        const face = op === "atMost" ? Math.min(...faces) : Math.max(...faces);
+        if ((op === "atMost" && face < pick.d) || (op !== "atMost" && face > pick.d)) {
+          return { type: "adjust", adjustment: { kind: "turn", card: turn.card, die: pick.i, face } };
+        }
+      }
+    }
+    const reroll = options.find((o) => o.kind === "reroll");
+    if (reroll && m.dice.length) return { type: "adjust", adjustment: { kind: "reroll", card: reroll.card, dice: [op === "atMost" ? highest() : lowest()] } };
+  }
+  return { type: "resolve" };
+}
+
 export function botAction(state: GameState, lib: CardLibrary): Action {
   const p = currentPlayer(state);
   switch (state.phase) {
@@ -81,7 +122,7 @@ export function botAction(state: GameState, lib: CardLibrary): Action {
       return { type: "endGuildPhase" };
     }
     case "adventure": {
-      if (state.mission) return { type: state.mission.stage === "assemble" ? "roll" : "resolve" };
+      if (state.mission) return missionStep(state, lib);
       const tasks = [
         ...p.formal.filter((f) => f.timer !== null).sort((a, b) => a.timer! - b.timer!).map((f) => f.uid),
         ...p.staging,
