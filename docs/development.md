@@ -30,6 +30,7 @@
 | `npm test` | 執行測試 |
 | `npm run web:dev` | 啟動測試模式的開發伺服器 |
 | `npm run web:build` | 打包測試模式為 `packages/web/dist/index.html`（單一檔案，用瀏覽器直接開啟） |
+| `node scripts/artifact.mjs <檔案>` | 把打包結果轉成可以發布為 claude.ai 網頁的內容 |
 | `npm run abilities` | 更新能力實作進度表 `docs/ability-status.md` |
 | `npm run sim -- 200` | 用 AI 玩家跑 200 局模擬，統計整體數據 |
 | `npm run cards:update` | 從 Google 試算表下載最新內容，產生卡片資料與檢查報告 |

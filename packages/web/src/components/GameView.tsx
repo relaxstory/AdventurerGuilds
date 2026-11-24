@@ -47,6 +47,7 @@ export function GameView({
   const [usingItem, setUsingItem] = useState<string | null>(null);
   const [task, setTask] = useState<string | null>(null);
   const [party, setParty] = useState<string[]>([]);
+  const [confirmQuit, setConfirmQuit] = useState(false);
 
   const blocked = !!state.pending;
   const dispatch = () => {
@@ -64,7 +65,15 @@ export function GameView({
         </div>
         <div className="row">
           <button onClick={undo} disabled={!canUndo} title="只能反悔沒有揭露新資訊的操作">反悔</button>
-          <button onClick={() => confirm("確定要放棄這局，回到設定畫面嗎？") && quit()}>新遊戲</button>
+          {confirmQuit ? (
+            <>
+              <span className="muted">放棄這局？</span>
+              <button className="warn" onClick={quit}>放棄並回到設定</button>
+              <button onClick={() => setConfirmQuit(false)}>繼續玩</button>
+            </>
+          ) : (
+            <button onClick={() => setConfirmQuit(true)}>新遊戲</button>
+          )}
         </div>
       </header>
       {error && <div className="error">{error}</div>}
