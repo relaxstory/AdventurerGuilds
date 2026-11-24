@@ -5,6 +5,7 @@ import * as ab from "./abilities.js";
 import { RULES } from "./constants.js";
 import type { CardLibrary, ItemDef } from "./defs.js";
 import { RuleError } from "./errors.js";
+import type { Rng } from "./rng.js";
 import type { GameState, PlayerState } from "./state.js";
 
 type Log = (text: string) => void;
@@ -132,7 +133,7 @@ export interface UseItemParams {
  * 使用道具：「消耗此道具：……」以及「消耗所有同名道具」（火爪的信念）。
  * 影響骰數的道具只能在派遣的組隊步驟使用；希氏炸藥在擲骰後的調整步驟使用。
  */
-export function useItem(state: GameState, lib: CardLibrary, p: PlayerState, a: UseItemParams, log: Log): void {
+export function useItem(state: GameState, lib: CardLibrary, p: PlayerState, a: UseItemParams, log: Log, rng?: Rng): void {
   if (!p.items.includes(a.item)) throw new RuleError("只能使用自己的道具");
   if (state.phase !== "guild" && state.phase !== "adventure") throw new RuleError("道具只能在公會階段或冒險階段使用");
   const def = itemDef(state, lib, a.item);
@@ -170,6 +171,9 @@ export function useItem(state: GameState, lib: CardLibrary, p: PlayerState, a: U
   const itemTokens = { ...state.itemCards[a.item]!.tokens };
   removeItem(state, p, a.item);
   log(`使用${label}`);
+  // 對其他玩家的冒險者使用不利的道具（縮小藥劑、紅斑菌菇）：守門員小嗶可以擋下
+  const harmful = clauses.some((c) => (c.code === "EFF_BASE_DICE_ROUND" && Number(c.x) < 0) || c.code === "EFF_NO_RESET_ROUND");
+  if (target && harmful && rng && !ab.passesGuard(state, lib, rng, p.id, target, log)) return;
   for (const c of clauses) {
     const card = target ? state.adventurerCards[target]! : undefined;
     const name = target ? ab.faceOf(state, lib, target).name : "";

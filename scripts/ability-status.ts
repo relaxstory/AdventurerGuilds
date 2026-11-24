@@ -18,13 +18,12 @@ for (const kind of ["adventurers", "derivatives", "items", "tasks"]) {
     if ((c.status === "實裝" || c.status === "測試") && !(c.type ?? "").startsWith("史詩")) active.add(`${c.id || "（無編號）"}｜${c.name}`);
   }
 }
-// 需要消耗道具作為代價的主動能力，隨道具一起實作（以 COST+道具 標示）
 const byCard = new Map<string, { name: string; skills: Map<string, string[]> }>();
-for (const [id = "", name = "", , skill = "", , code = "", , , z = ""] of rows.filter((r) => r.length > 5)) {
+for (const [id = "", name = "", , skill = "", , code = ""] of rows.filter((r) => r.length > 5)) {
   const key = `${id}｜${name}`;
   if (!active.has(key)) continue;
   const card = byCard.get(key) ?? { name, skills: new Map() };
-  card.skills.set(skill, [...(card.skills.get(skill) ?? []), code === "COST" && z ? "COST+道具" : code]);
+  card.skills.set(skill, [...(card.skills.get(skill) ?? []), code]);
   byCard.set(key, card);
 }
 const skillDone = (codes: string[]) => codes.length > 0 && codes.every((c) => IMPLEMENTED.has(c));

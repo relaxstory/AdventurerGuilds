@@ -30,6 +30,8 @@ export interface ActivateParams {
   readonly item?: string;
   /** 要從工作室創造的衍生物（瑪絲珂）。 */
   readonly derivative?: string;
+  /** 學舌鳥【伶牙俐齒】：用學舌鳥複製這個能力的效果；params 為複製時另外指定的目標等參數。 */
+  readonly copy?: { readonly card: string; readonly params?: Omit<ActivateParams, "card" | "skill" | "copy"> };
 }
 
 export type Decision =
@@ -62,7 +64,7 @@ const EFFECTS = new Set([
   "EFF_GAIN", "EFF_RESET", "EFF_FLIP_SELF", "EFF_RETRIEVE_TASK", "EFF_DISCARD_RECRUIT", "EFF_OPPONENT_TAP_OR_PAY",
   "EFF_OPPONENT_TAP_OR_FLIP", "EFF_TAP_WITH_TRAIT", "EFF_ADD_TOKENS_SELF", "EFF_REMOVE_TOKENS_SELF", "ADD_PARTICIPANT",
   "EFF_GAIN_ITEM_CHOICE", "EFF_CONVERT_ITEMS", "EFF_CREATE_ITEM_MOVE_TOKENS",
-  "EFF_CREATE_FROM_WORKSHOP", "EFF_TAP_BASE_DICE_BELOW", "EFF_TRANSFER_TOKENS_DESTROY",
+  "EFF_CREATE_FROM_WORKSHOP", "EFF_TAP_BASE_DICE_BELOW", "EFF_TRANSFER_TOKENS_DESTROY", "EFF_FLIP_DOUBLE_TEMP",
 ]);
 
 /** 冒險者的主動能力：有 COST 子句的技能。回傳技能名稱 → 子句。 */
@@ -123,6 +125,45 @@ export function activate(state: GameState, lib: CardLibrary, rng: Rng, p: Player
   }
 
   // 先檢查效果的目標（沒有合法目標就不能發動，也不能先付代價）
+  const plan = planEffects(state, lib, rng, p, a, label, effects, log);
+
+  // 學舌鳥【伶牙俐齒】：複製這個能力「：」後的效果（只能複製目前可以完整執行的效果）
+  let copyPlan: (() => void)[] | null = null;
+  let bird: string | null = null;
+  if (a.copy) {
+    bird = a.copy.card;
+    if (!p.adventurers.includes(bird) || bird === a.card || !ab.has(state, lib, bird, "EFF_COPY_ABILITY")) throw new RuleError("只能用自己公會中的學舌鳥複製其他冒險者的能力");
+    if (!upright(state, bird)) throw new RuleError(`${ab.faceOf(state, lib, bird).name} 已經橫置，無法複製`);
+  }
+
+  // 支付代價，然後依序執行效果
+  if (tapCost) state.adventurerCards[a.card]!.tapped = true;
+  p.gold -= goldCost;
+  if (itemCost) consumeCategory(state, lib, p, Number(itemCost[1]), itemCost[2]!, log);
+  log(`發動 ${label}${tapCost ? "，橫置" : ""}${goldCost ? `，支付 ${goldCost} 金` : ""}`);
+  for (const step of plan) step();
+  if (bird && a.copy) {
+    // 複製的效果中，「此冒險者」指學舌鳥
+    const birdLabel = `${ab.faceOf(state, lib, bird).name}【伶牙俐齒】`;
+    copyPlan = planEffects(state, lib, rng, p, { ...a, ...a.copy.params, card: bird, skill: a.skill }, birdLabel, effects, log);
+    state.adventurerCards[bird]!.tapped = true;
+    log(`${birdLabel}：橫置，複製 ${label} 的效果`);
+    for (const step of copyPlan) step();
+  }
+}
+
+
+/** 檢查效果的參數與目標，回傳依序執行的步驟。無法完整執行時拋出 RuleError。 */
+function planEffects(
+  state: GameState,
+  lib: CardLibrary,
+  rng: Rng,
+  p: PlayerState,
+  a: ActivateParams,
+  label: string,
+  effects: readonly ClauseDef[],
+  log: Log,
+): (() => void)[] {
   const max = 1 + ab.targetBonus(state, lib, p);
   const plan: (() => void)[] = [];
   for (const c of effects) {
@@ -148,12 +189,16 @@ export function activate(state: GameState, lib: CardLibrary, rng: Rng, p: Player
           if (!ab.canTarget(state, lib, a.card, p.id, t)) throw new RuleError(`${label}：不能指定 ${f.name}`);
         }
         plan.push(() => {
-          for (const t of targets) state.adventurerCards[t]!.tapped = true;
-          log(`${label}：橫置 ${targets.map((t) => ab.faceOf(state, lib, t).name).join("、")}`);
+          for (const t of targets) {
+            if (!ab.passesGuard(state, lib, rng, p.id, t, log)) continue;
+            state.adventurerCards[t]!.tapped = true;
+            log(`${label}：橫置 ${ab.faceOf(state, lib, t).name}`);
+          }
         });
         break;
       }
       case "EFF_FLIP_SELF":
+        if (!ab.canFlip(state, lib, a.card)) throw new RuleError(`${label}：${ab.faceOf(state, lib, a.card).name} 無法翻面，效果無法完整執行`);
         plan.push(() => ab.flip(state, lib, a.card, p.id, log));
         break;
       case "EFF_RETRIEVE_TASK": {
@@ -280,8 +325,23 @@ export function activate(state: GameState, lib: CardLibrary, rng: Rng, p: Player
           if (!ab.canTarget(state, lib, a.card, p.id, t)) throw new RuleError(`${label}：不能指定 ${f.name}`);
         }
         plan.push(() => {
-          for (const t of targets) state.adventurerCards[t]!.tapped = true;
-          log(`${label}：橫置 ${targets.map((t) => ab.faceOf(state, lib, t).name).join("、")}`);
+          for (const t of targets) {
+            if (!ab.passesGuard(state, lib, rng, p.id, t, log)) continue;
+            state.adventurerCards[t]!.tapped = true;
+            log(`${label}：橫置 ${ab.faceOf(state, lib, t).name}`);
+          }
+        });
+        break;
+      }
+      case "EFF_FLIP_DOUBLE_TEMP": {
+        const [t] = sameTargets(a.targets, 1, label);
+        if (!p.adventurers.includes(t!) || t === a.card) throw new RuleError(`${label}：請選擇自己公會中的一名雙面冒險者`);
+        if (!ab.canFlip(state, lib, t!)) throw new RuleError(`${label}：${ab.faceOf(state, lib, t!).name} 不是可以翻面的雙面冒險者`);
+        plan.push(() => {
+          log(`${label}：暫時翻轉 ${ab.faceOf(state, lib, t!).name}，菲特放在它下方`);
+          ab.flip(state, lib, t!, p.id, log); // 翻面會觸發「當此冒險者被翻面時」（G15）
+          state.adventurerCards[t!]!.flipLock = a.card;
+          state.adventurerCards[a.card]!.under = t!;
         });
         break;
       }
@@ -317,23 +377,18 @@ export function activate(state: GameState, lib: CardLibrary, rng: Rng, p: Player
     }
   }
 
-  // 支付代價，然後依序執行效果
-  if (tapCost) state.adventurerCards[a.card]!.tapped = true;
-  p.gold -= goldCost;
-  if (itemCost) consumeCategory(state, lib, p, Number(itemCost[1]), itemCost[2]!, log);
-  log(`發動 ${label}${tapCost ? "，橫置" : ""}${goldCost ? `，支付 ${goldCost} 金` : ""}`);
-  for (const step of plan) step();
+  return plan;
 }
 
 /** 玩家做出 pending 要求的決定。 */
-export function decide(state: GameState, lib: CardLibrary, d: Decision, log: (player: string, text: string) => void): void {
+export function decide(state: GameState, lib: CardLibrary, d: Decision, log: (player: string, text: string) => void, rng?: Rng): void {
   const pending = state.pending;
   if (!pending) throw new RuleError("目前不需要做決定");
   const who = state.players.find((x) => x.id === pending.player)!;
   const say = (text: string) => log(who.id, text);
   const ownUpright = (t: string) => who.adventurers.includes(t) && !state.adventurerCards[t]!.tapped;
   state.pending = null;
-  resolveDecision(state, lib, pending, d, who, say, ownUpright);
+  resolveDecision(state, lib, pending, d, who, say, ownUpright, rng);
   // 下一個排隊中的決定
   if (!state.pending && state.pendingQueue.length) state.pending = state.pendingQueue.shift()!;
 }
@@ -346,6 +401,7 @@ function resolveDecision(
   who: PlayerState,
   say: (text: string) => void,
   ownUpright: (t: string) => boolean,
+  rng?: Rng,
 ): void {
   switch (pending.kind) {
     case "tapOrPay":
@@ -371,6 +427,7 @@ function resolveDecision(
     }
     case "tapTarget": {
       if (d.option !== "tap" || !pending.targets.includes(d.target)) throw new RuleError("請從可以指定的冒險者中選擇");
+      if (rng && !ab.passesGuard(state, lib, rng, who.id, d.target, say)) break;
       state.adventurerCards[d.target]!.tapped = true;
       say(`${ab.faceOf(state, lib, pending.source).name}：橫置 ${ab.faceOf(state, lib, d.target).name}`);
       break;

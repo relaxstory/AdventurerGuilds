@@ -9,7 +9,7 @@ import { turnOptions } from "./dice.js";
 import { RuleError } from "./errors.js";
 import type { Rng } from "./rng.js";
 import { countCategory, consumeCategory, gainItem, splitList } from "./items.js";
-import { workshopOptions } from "./lifecycle.js";
+import { destroyAdventurer, workshopOptions } from "./lifecycle.js";
 import type { GameState, Mission, Pending, PlayerState } from "./state.js";
 
 /** 已實作的技能模板。其餘模板在對應的開發批次完成（docs/development.md）。 */
@@ -43,7 +43,27 @@ export const IMPLEMENTED = new Set([
   "EFF_TAP_BASE_DICE_BELOW", "EFF_TRANSFER_TOKENS_DESTROY", "SETTLE_RESET", "WITH_CARD_DESTROY_AFTER",
   "TURNSTART_CREATE_TOKEN", "TURNSTART_TASK_TIME", "ON_DESTROY_GAIN", "REPLACE_DESTROY_ALLY",
   "REPLACE_DESTROY_UNIQUE_ITEM", "ON_REP_DECREASE_DESTROY",
+  // M3-4d：特殊能力
+  "GUARD_REDIRECT", "EFF_FLIP_DOUBLE_TEMP", "EFF_COPY_ABILITY", "SHUFFLE_BACK_WITH", "TASK_AUTO_COMPLETE_TRAIT",
 ]);
+
+/**
+ * 守門員小嗶【不可以過！】：其他玩家要以「不利」的效果指定你的冒險者時，改為指定守門員小嗶。
+ * 發動能力的玩家擲 1 顆骰子，結果未大於精工指示物數時取消該次能力；之後銷毀守門員小嗶。
+ * 不論取消或轉移，原本的目標都不受影響，所以回傳 false（目標不受影響）或 true（照常生效）。
+ * 簡化：守門員小嗶一定會被使用（它在輪末就會被銷毀，保留沒有好處）。
+ */
+export function passesGuard(state: GameState, lib: CardLibrary, rng: Rng, actor: string, target: string, log: Log): boolean {
+  const owner = ownerOf(state, target);
+  if (!owner || owner.id === actor) return true;
+  const guard = owner.adventurers.find((u) => u !== target && has(state, lib, u, "GUARD_REDIRECT"));
+  if (!guard) return true;
+  const limit = amount(state, lib, guard, clauses(state, lib, guard, "GUARD_REDIRECT")[0]!.x);
+  const roll = rng.d6();
+  log(`${faceOf(state, lib, guard).name}【不可以過！】：改為指定它，擲出 ${roll}${roll <= limit ? `，未大於 ${limit}，取消該次能力` : `，大於 ${limit}，能力打在守門員小嗶身上`}`);
+  destroyAdventurer(state, lib, guard, log, false);
+  return false;
+}
 
 // ── 新兵小隊（docs/spec.md 12）──
 
@@ -267,6 +287,7 @@ export function addTokens(state: GameState, lib: CardLibrary, uid: string, token
 /** 雙面卡的另一面是否存在。 */
 export function canFlip(state: GameState, lib: CardLibrary, uid: string): boolean {
   const card = state.adventurerCards[uid]!;
+  if (card.flipLock) return false; // 菲特的能力結束前不能再翻面
   const other = card.face === "front" ? `${card.defId}B` : card.defId;
   return lib.adventurers.has(other);
 }
@@ -784,8 +805,13 @@ export function outcome(state: GameState, lib: CardLibrary, m: Mission): { faceS
   const result = (faceSum + resultModifier(state, lib, m, def) + m.resultDelta) * m.resultTimes;
   const n = difficulty(state, lib, m, def);
   // 區間條件由玩家分配難度調整到兩端，等同於結果落在 [X−n, Y+n] 內即可
+  // 送錯的軍令：派遣具有特定特質的冒險者參與，可直接完成此任務
+  const traitAuto = lib.clauses(def).some(
+    (t) => t.code === "TASK_AUTO_COMPLETE_TRAIT" && m.dispatched.some((u) => faceOf(state, lib, u).traits.some((x) => bare(x) === bare(t.x))),
+  );
   const success =
     m.autoSuccess ||
+    traitAuto ||
     (c.op === "atLeast" ? result >= c.x - n : c.op === "atMost" ? result <= c.x + n : result >= c.x - n && result <= c.y + n);
   return { faceSum, result, n, success };
 }
@@ -803,5 +829,40 @@ export function onSettleChoices(state: GameState, lib: CardLibrary, p: PlayerSta
   if (m.gamble && success && m.gamble.successBefore) {
     const c = clauses(state, lib, m.gamble.uid, "GAMBLE_REROLL")[0];
     if (c) gain(p, m.gamble.count * amount(state, lib, m.gamble.uid, c.z), "金幣", log, `${faceOf(state, lib, m.gamble.uid).name}【加注】成功`);
+  }
+}
+
+/** 暴走小嗶【嗶！（跑！）】：和指定的冒險者在同一個公會時，洗回冒險者牌庫。 */
+export function shuffleBackCheck(state: GameState, lib: CardLibrary, rng: Rng, log: (player: string, text: string) => void): void {
+  for (const p of state.players) {
+    for (const uid of [...p.adventurers]) {
+      for (const c of clauses(state, lib, uid, "SHUFFLE_BACK_WITH")) {
+        if (!p.adventurers.some((u) => u !== uid && sameName(faceOf(state, lib, u).name, c.x))) continue;
+        p.adventurers = p.adventurers.filter((u) => u !== uid);
+        const card = state.adventurerCards[uid]!;
+        card.tapped = false;
+        card.tokens = {};
+        const pos = rng.int(0, state.adventurerDeck.length);
+        state.adventurerDeck.splice(pos, 0, uid);
+        log(p.id, `${faceOf(state, lib, uid).name} 和 ${c.x} 在同一個公會，被洗回冒險者牌庫`);
+      }
+    }
+  }
+}
+
+/** 菲特【如果當時……】：輪末把被暫時翻面的卡翻回來，菲特移回原位。 */
+export function endTemporaryFlips(state: GameState, lib: CardLibrary, log: (player: string, text: string) => void): void {
+  for (const p of state.players) {
+    for (const fate of p.adventurers) {
+      const card = state.adventurerCards[fate]!;
+      if (!card.under) continue;
+      const target = card.under;
+      delete card.under;
+      const t = state.adventurerCards[target];
+      if (!t) continue;
+      delete t.flipLock;
+      log(p.id, `${faceOf(state, lib, fate).name} 移回原位`);
+      flip(state, lib, target, p.id, (x) => log(p.id, x));
+    }
   }
 }

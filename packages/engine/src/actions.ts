@@ -188,7 +188,7 @@ export function applyAction(prev: GameState, action: Action, lib: CardLibrary): 
     }
 
     case "useItem": {
-      useItem(state, lib, p, action, log);
+      useItem(state, lib, p, action, log, rng);
       break;
     }
 
@@ -200,7 +200,7 @@ export function applyAction(prev: GameState, action: Action, lib: CardLibrary): 
     }
 
     case "decide": {
-      decide(state, lib, action.decision, (player, text) => state.log.push({ round: state.round, player, text }));
+      decide(state, lib, action.decision, (player, text) => state.log.push({ round: state.round, player, text }), rng);
       break;
     }
 
@@ -277,6 +277,8 @@ export function applyAction(prev: GameState, action: Action, lib: CardLibrary): 
     }
   }
 
+  // 暴走小嗶：和瑪絲珂在同一個公會時洗回牌庫
+  ab.shuffleBackCheck(state, lib, rng, (player, text) => state.log.push({ round: state.round, player, text }));
   // 聲望下降時的觸發（梅里妲的注視）
   checkReputationDrops(state, lib, reputationBefore, (player, text) => state.log.push({ round: state.round, player, text }));
   state.rng = rng.snapshot();
@@ -484,7 +486,8 @@ function beginTurn(state: GameState, lib: CardLibrary): void {
 }
 
 function roundEnd(state: GameState, lib: CardLibrary, rng: Rng): void {
-  // 1. 輪末效果
+  // 1. 輪末效果（菲特的暫時翻面在此結束）
+  ab.endTemporaryFlips(state, lib, (player, text) => state.log.push({ round: state.round, player, text }));
   ab.onRoundEnd(state, lib, (p, text) => state.log.push({ round: state.round, player: p.id, text }));
   // 2. 所有冒險者重置（「不會於輪末重置」的除外）
   for (const p of state.players) {

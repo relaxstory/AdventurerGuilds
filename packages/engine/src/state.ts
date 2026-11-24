@@ -30,6 +30,10 @@ export interface AdventurerCard {
   tokens: Record<string, number>;
   /** 本輪已經用過「每輪第一次派遣不橫置」的輪次。 */
   freeDispatchRound?: number;
+  /** 菲特【如果當時……】：被暫時翻面的卡片，記錄菲特的 uid；能力結束前不能再翻面。 */
+  flipLock?: string;
+  /** 菲特：放在哪張卡的下方（輪末移回原位）。 */
+  under?: string;
   /** 衍生物（不佔容量，被銷毀時回到衍生物牌組）。 */
   derivative?: boolean;
   /** 瑪絲珂的工作室：可以創造的衍生物名稱。 */
