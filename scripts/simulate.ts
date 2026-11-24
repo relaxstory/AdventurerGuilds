@@ -28,9 +28,9 @@ for (let seed = 1; seed <= games; seed++) {
     if (p.upgraded) up++;
   }
   for (const l of s.log) {
-    if (l.text.startsWith("派遣")) {
+    if (l.text.includes("」結果值")) {
       dispatches++;
-      if (l.text.includes("成功")) success++;
+      if (l.text.endsWith("成功") || l.text.includes("：成功")) success++;
     }
     if (l.text.includes("逾期，")) expired++;
   }
