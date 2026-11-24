@@ -66,7 +66,7 @@ STD-C28,馬克,1,【善心助人】,1,PARTICIPATE_GAIN,1,聲望,,
 STD-C28,馬克,2,【一朝被蛇咬】,1,CANNOT_PARTICIPATE_WITH,[狡詐],,,
 STD-C29,芙蕾雅．霜語,1,【來自遠方的鼓勵】,1,ON_RECRUIT_GAIN_ITEM,父親的家書,,,
 STD-C29,芙蕾雅．霜語,2,【永不言棄】,1,TASK_DIFFICULTY,有嘗試指示物,1,,
-STD-C30,戈拉古斯．泥鏟,1,【先讓我把它畫下來】,1,COMPLETE_GAIN_ITEM,[遺跡],戈拉古斯的手稿,,[遺跡] 標籤待決定
+STD-C30,戈拉古斯．泥鏟,1,【先讓我把它畫下來】,1,COMPLETE_GAIN_ITEM,[遺跡],戈拉古斯的手稿,,[遺跡] 為預留標籤
 STD-C31,羅德教授,1,【審時度勢】,1,AFTER_ROLL_TURN,[聰明],2,,
 STD-C32,「冒失鬼」莎莉,1,【唉呦！】,1,AFTER_ROLL_REMOVE_FACE,[聰明],6,,
 STD-C32,「冒失鬼」莎莉,2,【應該也不算太差？】,1,PER_REMOVED_DIE_GAIN,1,金幣,,
@@ -91,14 +91,15 @@ STD-C40,「歧路觀測者」菲特,2,【如果當時……】,2,EFF_FLIP_DOUBLE
 STD-C41,「爆炸頭」傑米,1,【嘗試配方】,1,COST,橫置此冒險者,,,
 STD-C41,「爆炸頭」傑米,1,【嘗試配方】,2,EFF_ADD_TOKENS_SELF,3,精工,,
 STD-C41,「爆炸頭」傑米,2,【別爆別爆別爆……】,1,TOKEN_PLACED_RISK,精工,1,,
-STD-C41,「爆炸頭」傑米,3,【看我的傑作！】,1,EFF_CREATE_ITEM_MOVE_TOKENS,希氏炸藥,精工,,發動時機待決定，決定後加上 COST 子句
+STD-C41,「爆炸頭」傑米,3,【看我的傑作！】,1,COST,橫置此冒險者,,,
+STD-C41,「爆炸頭」傑米,3,【看我的傑作！】,2,EFF_CREATE_ITEM_MOVE_TOKENS,希氏炸藥,精工,,
 STD-C42,艾里克,1,【最後的禱言】,1,ON_DESTROY_GAIN,非衍生物的,2,,
 STD-C42,艾里克,2,【晨間禱告】,1,COST,橫置此冒險者,,,
 STD-C42,艾里克,2,【晨間禱告】,2,EFF_GAIN,1,聲望,,
 STD-C43,「金牙」古斯,1,【我是在幫你們解決問題】,1,COMPLETE_GAIN,,-1,聲望,
 STD-C43,「金牙」古斯,2,【你跑不掉的】,1,BASE_DICE_CHOICE,0,4,,
 STD-C44,「修女」梅里妲,1,【梅里妲的注視】,1,ON_RECRUIT_GIVE_ITEM,梅里妲的注視,,,
-STD-C45,薩姆．火爪,1,【野火蔓延】,1,ON_ANY_COMPLETE_TAG_ITEM,[火焰]／[森林],火爪的信念／灰燼,,[火焰] 標籤待決定
+STD-C45,薩姆．火爪,1,【野火蔓延】,1,ON_ANY_COMPLETE_TAG_ITEM,[火焰]／[森林],火爪的信念／灰燼,,[火焰] 為預留標籤
 STD-C46,「賭徒」馬文,1,【加注】,1,GAMBLE_REROLL,1,3,2,
 STD-C47,學舌鳥,1,【伶牙俐齒】,1,EFF_COPY_ABILITY,,,,特殊：觸發條件與代價寫在模板中
 STD-C48,「青蛙合唱團」兜,1,【共鳴】,1,FREE_RECRUIT_IF_NAME,青蛙合唱團,,,
@@ -141,7 +142,7 @@ STD-C60,漢克．溫徹斯特,1,【農莊加工】,1,SELL_PRICE_MOD,[乳製品]�
 STD-C60,漢克．溫徹斯特,2,【農產加工】,1,COST,橫置此冒險者,,,
 STD-C60,漢克．溫徹斯特,2,【農產加工】,2,EFF_CONVERT_ITEMS,2,[農產品],漢克的貨品,
 STD-C61,凱莉．溫徹斯特,1,【牧場鮮乳】,1,TURNEND_GAIN_ITEM,,1,牛乳,
-STD-C61,凱莉．溫徹斯特,2,【牧場好朋友】,1,AFTER_ROLL_TURN,[動物],1,,[動物] 標籤待決定
+STD-C61,凱莉．溫徹斯特,2,【牧場好朋友】,1,AFTER_ROLL_TURN,[動物],1,,[動物] 為預留標籤
 STD-T01,重拳小嗶,1,【精工】,1,ON_CREATE_TRANSFER_TOKENS,「天才」瑪絲珂,精工,,
 STD-T01,重拳小嗶,2,【重拳出擊！】,1,DICE_PER_TOKEN,精工,1,,
 STD-T01,重拳小嗶,3,【臨時機體】,1,ROUNDEND_DESTROY_SELF,,,,
