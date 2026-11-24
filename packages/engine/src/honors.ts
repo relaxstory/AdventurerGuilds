@@ -1,4 +1,4 @@
-import { raceOf } from "./abilities.js";
+import { raceOf, unitBaseDice } from "./abilities.js";
 import type { CardLibrary, TaskDef } from "./defs.js";
 import type { GameResult, GameState, HonorResult, PlayerState } from "./state.js";
 
@@ -49,7 +49,7 @@ export const HONOR_RULES: Record<string, Evaluator> = {
   H14: (ctx, p) => count(completedDefs(ctx, p), (t) => (t.reputation ?? 0) === 0), // 只為報酬
   H15: (ctx, p) => new Set(completedDefs(ctx, p).flatMap((t) => t.tags)).size, // 見多識廣
   H16: (ctx, p) => faces(ctx, p).length, // 人才濟濟（衍生物不計入，M3）
-  H17: (ctx, p) => faces(ctx, p).reduce((s, a) => s + (a.baseDice ?? 0), 0), // 兵強馬壯
+  H17: (ctx, p) => p.adventurers.reduce((s, uid) => s + unitBaseDice(ctx.state, ctx.lib, uid), 0), // 兵強馬壯（小隊為全隊加總）
   H18: (ctx, p) => maxGroup(faces(ctx, p).map((a) => stripB(a.profession))), // 術業專攻
   H19: (ctx, p) => new Set(faces(ctx, p).map((a) => stripB(a.profession)).filter(Boolean)).size, // 百工百業
   H20: (ctx, p) => new Set(p.adventurers.map((uid) => raceOf(ctx.state, ctx.lib, uid)).filter(Boolean)).size, // 多元共榮（菲特視為人類）

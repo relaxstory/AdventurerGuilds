@@ -2,18 +2,18 @@
  * 簡單的 AI 玩家：用來自動跑完整局、驗證規則與做平衡模擬。
  * 策略刻意保持單純，不代表最佳玩法。
  */
-import { adjustOptions, clauses, dispatchLimitProblem, mustDispatch, outcome, participants, participationProblem, salaryFor } from "./abilities.js";
+import { adjustOptions, clauses, dispatchLimitProblem, squadKeyword, unitBaseDice, mustDispatch, outcome, participants, participationProblem, salaryFor } from "./abilities.js";
 import { activatedSkills, activationImplemented } from "./activate.js";
 import { itemDef, sellPrice } from "./items.js";
 import { turnOptions } from "./dice.js";
-import { applyAction, baseDiceOf, stagingSlots, taskDef, upgradeCost, type Action, type ExpiryPenalty } from "./actions.js";
+import { applyAction, stagingSlots, taskDef, upgradeCost, type Action, type ExpiryPenalty } from "./actions.js";
 import { RuleError } from "./errors.js";
 import type { CardLibrary, CardSource } from "./defs.js";
 import { CardLibrary as Library } from "./defs.js";
 import { createGame } from "./setup.js";
 import { currentPlayer, type GameConfig, type GameState } from "./state.js";
 
-const value = (state: GameState, lib: CardLibrary, uid: string) => baseDiceOf(state, lib, uid) * 2 - salaryFor(state, lib, [uid]).total;
+const value = (state: GameState, lib: CardLibrary, uid: string) => unitBaseDice(state, lib, uid) * 2 - salaryFor(state, lib, [uid]).total;
 
 function bestTavernIndex(state: GameState, lib: CardLibrary): number {
   let best = -1;
@@ -33,7 +33,7 @@ function chooseParty(state: GameState, lib: CardLibrary, taskUid: string): strin
   if (!c) return null;
   const n = state.taskCards[taskUid]!.attempts;
   const upright = p.adventurers.filter((uid) => !state.adventurerCards[uid]!.tapped);
-  const dice = (uid: string) => baseDiceOf(state, lib, uid);
+  const dice = (uid: string) => unitBaseDice(state, lib, uid);
   const sum = (party: string[]) => party.reduce((s, uid) => s + dice(uid), 0);
   let party: string[] = [];
 
@@ -157,9 +157,15 @@ export function botAction(state: GameState, lib: CardLibrary): Action {
       }
       if (p.actionsLeft < 1) return { type: "endGuildPhase" };
       const recruitIndex = bestTavernIndex(state, lib);
+      // 新兵：加入現有小隊的最下方（不佔容量）
+      for (const [i, uid] of state.tavern.entries()) {
+        const kw = squadKeyword(state, lib, uid);
+        const target = kw && p.adventurers.find((u) => squadKeyword(state, lib, u) === kw);
+        if (target) return { type: "recruit", tavernIndex: i, squad: { target, position: "bottom" } };
+      }
       if (p.adventurers.length < 3 && recruitIndex >= 0) return { type: "recruit", tavernIndex: recruitIndex };
       if (p.staging.length < stagingSlots(p)) {
-        const dice = p.adventurers.reduce((s, uid) => s + baseDiceOf(state, lib, uid), 0);
+        const dice = p.adventurers.reduce((s, uid) => s + unitBaseDice(state, lib, uid), 0);
         let best = -1;
         let bestScore = 0;
         state.board.forEach((uid, i) => {

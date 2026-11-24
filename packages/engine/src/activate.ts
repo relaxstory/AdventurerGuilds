@@ -164,7 +164,7 @@ export function activate(state: GameState, lib: CardLibrary, rng: Rng, p: Player
           p.adventurers = p.adventurers.filter((u) => u !== out);
           const card = state.adventurerCards[out!]!;
           card.tapped = false;
-          card.tokens = {}; // 進入棄置區時移除指示物
+          for (const u of ab.members(state, out!)) state.adventurerCards[u]!.tokens = {}; // 進入棄置區時移除指示物
           state.adventurerDiscard.push(out!);
           state.tavern.splice(i, 1);
           const next = state.adventurerDeck.shift();

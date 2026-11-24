@@ -30,6 +30,8 @@ export interface AdventurerCard {
   tokens: Record<string, number>;
   /** 本輪已經用過「每輪第一次派遣不橫置」的輪次。 */
   freeDispatchRound?: number;
+  /** 新兵小隊：這張卡是隊長時，底下的成員（由上到下，不含隊長）。 */
+  squad?: string[];
   /** 本輪的基礎骰數修正（藥劑、紅斑菌菇）。 */
   roundBaseDelta?: { round: number; delta: number };
   /** 本輪輪末無法重置（紅斑菌菇）。 */

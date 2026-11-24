@@ -35,7 +35,43 @@ export const IMPLEMENTED = new Set([
   "SUBSTITUTE_ITEM", "WHILE_HELD_NO_TAP_FIRST", "SELL_PRICE_MOD", "EXTRA_ITEM_SLOT", "ON_RECRUIT_GAIN_ITEM",
   "ON_RECRUIT_GIVE_ITEM", "COMPLETE_GAIN_ITEM", "ON_ANY_COMPLETE_TAG_ITEM", "TURNEND_GAIN_ITEM", "EFF_GAIN_ITEM_CHOICE",
   "EFF_CONVERT_ITEMS", "EFF_CREATE_ITEM_MOVE_TOKENS", "AFTER_ROLL_AUTO_SUCCESS",
+  // M3-4b：新兵小隊
+  "SQUAD", "SQUAD_DICE", "SQUAD_SALARY", "SQUAD_COMPLETE_GAIN", "SQUAD_RESULT_ADJUST", "SQUAD_DIFFICULTY",
 ]);
+
+// ── 新兵小隊（docs/spec.md 12）──
+
+/** 小隊的所有成員（隊長在最前面）；不是小隊時只有自己。 */
+export function members(state: GameState, uid: string): string[] {
+  return [uid, ...(state.adventurerCards[uid]!.squad ?? [])];
+}
+
+/** 可以組成小隊的冒險者：有【集結】，名字含指定關鍵字（例如「新兵」）。 */
+export function squadKeyword(state: GameState, lib: CardLibrary, uid: string): string | null {
+  return clauses(state, lib, uid, "SQUAD")[0]?.x || null;
+}
+
+/** 小隊中的士兵數（隊長能力「每有 X 名士兵」）。 */
+function soldiers(state: GameState, lib: CardLibrary, uid: string): number {
+  return members(state, uid).filter((u) => professionMatches(state, lib, u, "士兵")).length;
+}
+
+/** 隊長能力的倍數：每有 X 名士兵，效果 1 次。 */
+function perSoldiers(state: GameState, lib: CardLibrary, uid: string, c: ClauseDef): number {
+  return Math.floor(soldiers(state, lib, uid) / Math.max(1, amount(state, lib, uid, c.x))) * amount(state, lib, uid, c.y);
+}
+
+/** 一個冒險者（或一整支小隊）的基礎骰數：小隊為全隊加總。 */
+export function unitBaseDice(state: GameState, lib: CardLibrary, uid: string): number {
+  return members(state, uid).reduce((s, u) => s + Math.max(0, faceOf(state, lib, u).baseDice ?? 0), 0);
+}
+
+/** 一個冒險者（或一整支小隊）的薪資：小隊只付隊長的薪資，再套用隊長能力。 */
+export function unitSalary(state: GameState, lib: CardLibrary, uid: string): number {
+  let salary = Math.max(0, faceOf(state, lib, uid).salary ?? 0);
+  for (const c of clauses(state, lib, uid, "SQUAD_SALARY")) salary += perSoldiers(state, lib, uid, c);
+  return Math.max(0, salary);
+}
 
 /** 加入等待中的決定；已經有決定在等時排隊。 */
 export function pushPending(state: GameState, p: Pending): void {
@@ -337,7 +373,7 @@ export function mustDispatch(state: GameState, lib: CardLibrary, p: PlayerState)
 
 /** 薪資：方庚【今晚我請客】免除較低薪資的同職業同伴。回傳總薪資與被免除的人數（依免除者記錄）。 */
 export function salaryFor(state: GameState, lib: CardLibrary, party: readonly string[]): { total: number; waivedBy: Record<string, number> } {
-  const base = (u: string) => Math.max(0, faceOf(state, lib, u).salary ?? 0);
+  const base = (u: string) => unitSalary(state, lib, u);
   const waived = new Set<string>();
   const waivedBy: Record<string, number> = {};
   for (const uid of party) {
@@ -378,12 +414,13 @@ export function dicePool(state: GameState, lib: CardLibrary, m: Mission, def: Ta
   const attempts = state.taskCards[m.task]!.attempts;
   let total = 0;
   for (const uid of party) {
-    let base = m.baseDice[uid] ?? Math.max(0, faceOf(state, lib, uid).baseDice ?? 0);
+    let base = m.baseDice[uid] ?? unitBaseDice(state, lib, uid);
     const roundDelta = state.adventurerCards[uid]!.roundBaseDelta;
     if (roundDelta?.round === state.round) base += roundDelta.delta;
     for (const c of clauses(state, lib, uid, "TASK_BASE_DICE")) if (taskMatches(c.x, def, attempts)) base += amount(state, lib, uid, c.y);
     let dice = Math.max(0, base);
     for (const c of clauses(state, lib, uid, "DICE_PER_TOKEN")) dice += amount(state, lib, uid, c.x) * amount(state, lib, uid, c.y);
+    for (const c of clauses(state, lib, uid, "SQUAD_DICE")) dice += perSoldiers(state, lib, uid, c);
     for (const c of clauses(state, lib, uid, "WITH_CARD_DICE")) if (names.some((n) => sameName(n, c.x))) dice += amount(state, lib, uid, c.y);
     for (const c of clauses(state, lib, uid, "WITH_PROFESSION_DICE")) {
       if (party.some((o) => o !== uid && professionMatches(state, lib, o, c.x))) dice += amount(state, lib, uid, c.y);
@@ -430,6 +467,7 @@ export function difficulty(state: GameState, lib: CardLibrary, m: Mission, def: 
   for (const uid of party) {
     for (const c of clauses(state, lib, uid, "TASK_DIFFICULTY")) if (taskMatches(c.x, def, attempts)) n += amount(state, lib, uid, c.y);
     for (const c of clauses(state, lib, uid, "WITH_CARD_DIFFICULTY")) if (names.some((x) => sameName(x, c.x))) n += amount(state, lib, uid, c.y);
+    for (const c of clauses(state, lib, uid, "SQUAD_DIFFICULTY")) n += perSoldiers(state, lib, uid, c);
   }
   return Math.max(0, n);
 }
@@ -450,6 +488,7 @@ export function onSettle(
     const name = faceOf(state, lib, uid).name;
     if (ctx.success) {
       for (const c of clauses(state, lib, uid, "COMPLETE_GAIN")) if (taskMatches(c.x, def, attempts)) gain(p, amount(state, lib, uid, c.y), c.z, log, name);
+      for (const c of clauses(state, lib, uid, "SQUAD_COMPLETE_GAIN")) gain(p, perSoldiers(state, lib, uid, c), c.z, log, `${name}（隊長）`);
       for (const c of clauses(state, lib, uid, "COMPLETE_GAIN_ITEM")) {
         const options = splitList(c.y).filter((n) => lib.items.has(n));
         if (taskMatches(c.x, def, attempts) && options.length) pushPending(state, { kind: "chooseItem", player: p.id, options, optional: true, source: uid });
@@ -634,6 +673,10 @@ export function adjustOptions(state: GameState, lib: CardLibrary, m: Mission): A
     for (const c of clauses(state, lib, uid, "RESULT_ADJUST")) {
       if (!used(c.code)) out.push({ card: uid, kind: "adjustResult", remaining: amount(state, lib, uid, c.x), mandatory: false });
     }
+    for (const c of clauses(state, lib, uid, "SQUAD_RESULT_ADJUST")) {
+      const n = perSoldiers(state, lib, uid, c);
+      if (!used("RESULT_ADJUST") && n > 0) out.push({ card: uid, kind: "adjustResult", remaining: n, mandatory: false });
+    }
   }
   // 兜的和弦：每次你派遣冒險者執行任務時（公會中的能力，不需參與）
   const owner = state.players.find((p) => p.adventurers.includes(m.dispatched[0] ?? ""));
@@ -652,7 +695,7 @@ export function applyAdjustment(state: GameState, lib: CardLibrary, rng: Rng, m:
   const name = faceOf(state, lib, adj.card).name;
   if (!option) throw new RuleError(`${name} 現在不能使用這個能力`);
   const code = ADJUST_CODE[adj.kind];
-  const clause = clauses(state, lib, adj.card, code)[0]!;
+  const clause = clauses(state, lib, adj.card, code)[0] ?? clauses(state, lib, adj.card, "SQUAD_RESULT_ADJUST")[0]!;
   const key = useKey(adj.card, code);
   const checkDie = (i: number) => {
     if (!Number.isInteger(i) || i < 0 || i >= m.dice.length) throw new RuleError("沒有這顆骰子");

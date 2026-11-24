@@ -11,8 +11,16 @@ import { currentPlayer, currentPlayerIndex, type GameState, type PlayerState } f
 export type ExpiryPenalty = "gold" | "reputation";
 
 export type Action =
-  /** 公會階段：招募酒館第 tavernIndex 張（0 起算）；replace 為要解僱的冒險者。 */
-  | { readonly type: "recruit"; readonly tavernIndex: number; readonly replace?: string }
+  /**
+   * 公會階段：招募酒館第 tavernIndex 張（0 起算）；replace 為要解僱的冒險者。
+   * squad：把招募的新兵（或整支小隊）放到自己現有小隊的最上方或最下方（docs/spec.md 12）。
+   */
+  | {
+      readonly type: "recruit";
+      readonly tavernIndex: number;
+      readonly replace?: string;
+      readonly squad?: { readonly target: string; readonly position: "top" | "bottom" };
+    }
   /** 公會階段：接取公告欄第 boardIndex 張任務。 */
   | { readonly type: "acceptTask"; readonly boardIndex: number }
   | { readonly type: "endGuildPhase" }
@@ -104,6 +112,33 @@ export function applyAction(prev: GameState, action: Action, lib: CardLibrary): 
       const free = ab.freeRecruit(state, lib, p, uid);
       if (!free && p.actionsLeft < 1) throw new RuleError("本回合的公會行動已經用完");
       const name = adventurerFace(state, lib, uid).name;
+      if (action.squad) {
+        if (action.replace !== undefined) throw new RuleError("加入小隊時不需要解僱冒險者");
+        const { target, position } = action.squad;
+        const keyword = ab.squadKeyword(state, lib, uid);
+        const targetKeyword = p.adventurers.includes(target) ? ab.squadKeyword(state, lib, target) : null;
+        if (!keyword || keyword !== targetKeyword) throw new RuleError(`只有名字有「${keyword ?? "新兵"}」的冒險者能組成小隊`);
+        const incoming = state.adventurerCards[uid]!;
+        const existing = state.adventurerCards[target]!;
+        const tapped = existing.tapped;
+        if (position === "top") {
+          incoming.squad = [...(incoming.squad ?? []), target, ...(existing.squad ?? [])];
+          delete existing.squad;
+          p.adventurers[p.adventurers.indexOf(target)] = uid;
+          incoming.tapped = tapped;
+        } else {
+          existing.squad = [...(existing.squad ?? []), uid, ...(incoming.squad ?? [])];
+          delete incoming.squad;
+        }
+        state.tavern.splice(action.tavernIndex, 1);
+        const next = state.adventurerDeck.shift();
+        if (next) state.tavern.push(next);
+        const captain = position === "top" ? uid : target;
+        log(`招募 ${name}，放到小隊${position === "top" ? "最上方，成為隊長" : "最下方"}（小隊共 ${ab.members(state, captain).length} 人）`);
+        if (!free) p.actionsLeft -= 1;
+        ab.onRecruit(state, lib, p, uid, log);
+        break;
+      }
       if (action.replace !== undefined) {
         const i = p.adventurers.indexOf(action.replace);
         if (i < 0) throw new RuleError("只能解僱自己公會中的冒險者");
@@ -457,7 +492,7 @@ function roundEnd(state: GameState, lib: CardLibrary, rng: Rng): void {
 
   // 6. 酒館：最前端 2 名移到棄置區，其餘往前補，再補滿
   const dropped = state.tavern.splice(0, RULES.tavernDropPerRound);
-  for (const uid of dropped) state.adventurerCards[uid]!.tokens = {}; // 進入棄置區時移除指示物
+  for (const uid of dropped) for (const u of ab.members(state, uid)) state.adventurerCards[u]!.tokens = {}; // 進入棄置區時移除指示物
   state.adventurerDiscard.push(...dropped);
   while (state.tavern.length < RULES.tavernSize && state.adventurerDeck.length) state.tavern.push(state.adventurerDeck.shift()!);
 
