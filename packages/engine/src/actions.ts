@@ -225,7 +225,7 @@ function startMission(state: GameState, lib: CardLibrary, p: PlayerState, taskUi
     if (!p.adventurers.includes(uid)) throw new RuleError("只能派遣自己公會中的冒險者");
     if (state.adventurerCards[uid]!.tapped) throw new RuleError(`${adventurerFace(state, lib, uid).name} 已經橫置，不能派遣`);
   }
-  const problem = ab.participationProblem(state, lib, party);
+  const problem = ab.participationProblem(state, lib, party) ?? ab.dispatchLimitProblem(state, lib, party);
   if (problem) throw new RuleError(problem);
 
   const { total: salary } = ab.salaryFor(state, lib, party);
@@ -241,6 +241,7 @@ function startMission(state: GameState, lib: CardLibrary, p: PlayerState, taskUi
   if (p.gold < salary) throw new RuleError(`金幣不足：薪資需要 ${salary} 金，目前只有 ${p.gold} 金`);
   p.gold -= salary;
   for (const uid of party) if (ab.tapOnDispatch(state, lib, uid, log)) state.adventurerCards[uid]!.tapped = true;
+  ab.recordDispatch(state, party);
   p.missionsThisTurn += 1;
   const names = party.map((uid) => adventurerFace(state, lib, uid).name).join("、");
   log(`派遣 ${names} 執行「${def.name}」，支付薪資 ${salary} 金`);

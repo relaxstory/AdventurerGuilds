@@ -30,6 +30,8 @@ export interface AdventurerCard {
   tokens: Record<string, number>;
   /** 本輪已經用過「每輪第一次派遣不橫置」的輪次。 */
   freeDispatchRound?: number;
+  /** 本回合被派遣的次數：回合識別（輪-回合）與次數。 */
+  dispatches?: { turn: string; count: number };
 }
 
 /** 進行中的派遣（docs/spec.md 7.1）。組隊 → 擲骰 → 調整 → 結算。 */

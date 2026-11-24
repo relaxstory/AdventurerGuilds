@@ -2,7 +2,7 @@
  * 簡單的 AI 玩家：用來自動跑完整局、驗證規則與做平衡模擬。
  * 策略刻意保持單純，不代表最佳玩法。
  */
-import { adjustOptions, clauses, mustDispatch, outcome, participants, participationProblem, salaryFor } from "./abilities.js";
+import { adjustOptions, clauses, dispatchLimitProblem, mustDispatch, outcome, participants, participationProblem, salaryFor } from "./abilities.js";
 import { turnOptions } from "./dice.js";
 import { applyAction, baseDiceOf, stagingSlots, taskDef, upgradeCost, type Action, type ExpiryPenalty } from "./actions.js";
 import { RuleError } from "./errors.js";
@@ -49,15 +49,12 @@ function chooseParty(state: GameState, lib: CardLibrary, taskUid: string): strin
   }
 
   if (p.missionsThisTurn === 0) for (const must of mustDispatch(state, lib, p)) if (!party.includes(must)) party.push(must);
-  if (participationProblem(state, lib, party)) return null;
+  if (participationProblem(state, lib, party) || dispatchLimitProblem(state, lib, party)) return null;
   const salary = salaryFor(state, lib, party).total;
   if (salary > p.gold) return null;
   if (salary > (def.gold ?? 0) + 2 * Math.abs(def.reputation ?? 0) + 2) return null;
   return party;
 }
-
-/** AI 每回合最多派遣次數。 */
-export const BOT_MISSION_CAP = 8;
 
 /** 進行中的派遣：擲骰前的選擇、擲骰後的調整。 */
 function missionStep(state: GameState, lib: CardLibrary): Action {
@@ -126,8 +123,6 @@ export function botAction(state: GameState, lib: CardLibrary): Action {
     }
     case "adventure": {
       if (state.mission) return missionStep(state, lib);
-      // 保護：避免「不橫置的冒險者＋可重複完成的永久任務」造成無限派遣（規則待設計者決定）
-      if (p.missionsThisTurn >= BOT_MISSION_CAP) return { type: "endAdventurePhase" };
       const tasks = [
         ...p.formal.filter((f) => f.timer !== null).sort((a, b) => a.timer! - b.timer!).map((f) => f.uid),
         ...p.staging,

@@ -14,7 +14,7 @@ import type { GameState, Mission, PlayerState } from "./state.js";
 export const IMPLEMENTED = new Set([
   "COND_HAS_CARDS",
   "NO_ROUND_RESET", "NO_TAP_FIRST_DISPATCH", "NO_TAP_DISPATCH", "DISPATCH_ADD_TOKEN_NO_TAP",
-  "DICE_PER_TOKEN", "TOKEN_THRESHOLD_FLIP", "CANNOT_BE_FIRED", "NOT_COUNT_CAPACITY",
+  "DICE_PER_TOKEN", "TOKEN_THRESHOLD_FLIP", "DISPATCH_LIMIT_PER_TURN", "CANNOT_BE_FIRED", "NOT_COUNT_CAPACITY",
   "CANNOT_PARTICIPATE_WITH", "COUNTS_AS_RACE", "ANY_PROFESSION", "FREE_RECRUIT_IF_NAME", "MUST_PARTICIPATE_FIRST",
   "TASK_DIFFICULTY", "WITH_CARD_DIFFICULTY", "WITH_PROFESSION_DICE", "WITH_CARD_DICE", "TASK_BASE_DICE",
   "AFTER_ROLL_RESULT_MOD", "AFTER_ROLL_REMOVE_FACE", "PER_REMOVED_DIE_GAIN",
@@ -183,6 +183,32 @@ export function participationProblem(state: GameState, lib: CardLibrary, party: 
     }
   }
   return null;
+}
+
+const turnId = (state: GameState) => `${state.round}-${state.turnInRound}`;
+
+/** 本回合已經被派遣的次數。 */
+export function dispatchesThisTurn(state: GameState, uid: string): number {
+  const d = state.adventurerCards[uid]!.dispatches;
+  return d && d.turn === turnId(state) ? d.count : 0;
+}
+
+/** 每回合派遣次數上限（方庚【隨時警備】）；超過時回傳提示訊息。 */
+export function dispatchLimitProblem(state: GameState, lib: CardLibrary, party: readonly string[]): string | null {
+  for (const uid of party) {
+    for (const c of clauses(state, lib, uid, "DISPATCH_LIMIT_PER_TURN")) {
+      const limit = amount(state, lib, uid, c.x);
+      if (dispatchesThisTurn(state, uid) >= limit) return `${faceOf(state, lib, uid).name} 每回合只能被派遣 ${limit} 次`;
+    }
+  }
+  return null;
+}
+
+export function recordDispatch(state: GameState, party: readonly string[]): void {
+  for (const uid of party) {
+    const card = state.adventurerCards[uid]!;
+    card.dispatches = { turn: turnId(state), count: dispatchesThisTurn(state, uid) + 1 };
+  }
 }
 
 /** 每回合第一個任務必須派遣的冒險者（過勞死凱菲）。 */

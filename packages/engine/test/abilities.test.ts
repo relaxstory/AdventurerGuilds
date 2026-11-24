@@ -77,6 +77,19 @@ describe("派遣與橫置", () => {
     expect(ab.salaryFor(state, lib, [fang!, leon!]).total).toBe(3 + 3); // 萊昂是參謀，不免除
   });
 
+  it("方庚【隨時警備】：派遣後仍是直立，但每回合只能被派遣 1 次；下一個回合可以再派遣", () => {
+    let { state, lib } = realGame();
+    const [fang] = hire(state, "STD-C38");
+    const t = take(state, "STD-M01");
+    state.phase = "adventure";
+    currentPlayer(state).gold = 50;
+    state = run(state, lib, { type: "dispatch", task: t, adventurers: [fang!] }, { type: "roll" }, { type: "resolve" });
+    expect(state.adventurerCards[fang!]!.tapped).toBe(false);
+    expect(() => run(state, lib, { type: "dispatch", task: t, adventurers: [fang!] })).toThrow("每回合只能被派遣 1 次");
+    state.adventurerCards[fang!]!.dispatches = { turn: "上一個回合", count: 1 }; // 模擬換到下一個回合
+    expect(() => run(state, lib, { type: "dispatch", task: t, adventurers: [fang!] })).not.toThrow();
+  });
+
   it("凱菲：派遣時不橫置而是放疲勞指示物，每個疲勞骰數 +1，達到 5 個翻面為過勞死凱菲", () => {
     let { state, lib } = realGame();
     const [kafi] = hire(state, "STD-C55");

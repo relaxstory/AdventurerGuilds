@@ -42,6 +42,13 @@
     "params": "無"
   },
   {
+    "code": "DISPATCH_LIMIT_PER_TURN",
+    "name": "每回合派遣次數上限",
+    "type": "常駐",
+    "text": "此冒險者每回合只能被派遣{X}次。",
+    "params": "X＝次數"
+  },
+  {
     "code": "CANNOT_BE_FIRED",
     "name": "不能被解僱",
     "type": "常駐",
