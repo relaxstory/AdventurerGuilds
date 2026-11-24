@@ -4,7 +4,7 @@ import { kindLabel, type Issue } from "./validate.js";
 
 export interface ReportInput {
   readonly data: CardData;
-  readonly baseVersion: number | null;
+  readonly baseVersion: string | null;
   readonly diff: CardDiff;
   readonly numberUpdates: readonly NumberUpdate[];
   readonly issues: readonly Issue[];
@@ -15,7 +15,7 @@ const TARGET: Partial<Record<CardKind, string>> = { adventurers: "每局 80 張"
 
 export function renderReport(r: ReportInput): string {
   const L: string[] = [];
-  const base = r.baseVersion === null ? "（尚未發布過）" : `v${r.baseVersion}`;
+  const base = r.baseVersion ?? "（尚未發布過）";
   L.push(`# 卡片更新報告`, "");
   L.push(`- 產生時間：${r.builtAt}`);
   L.push(`- 比較基準：已發布的 ${base}`);

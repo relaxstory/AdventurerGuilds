@@ -17,12 +17,18 @@ export function write(file: string, content: string): void {
 
 export interface VersionIndex {
   latest: number | null;
-  history: { version: number; publishedAt: string; summary: string }[];
+  /** version 為內部序號（對局鎖定版本時使用）；name 為顯示名稱，例如 alpha1.0。 */
+  history: { version: number; name: string; publishedAt: string; summary: string }[];
 }
 
 export function readIndex(): VersionIndex {
   const f = path("versions", "index.json");
   return existsSync(f) ? (JSON.parse(read(f)) as VersionIndex) : { latest: null, history: [] };
+}
+
+export function versionName(index: VersionIndex, v: number | null): string | null {
+  if (v === null) return null;
+  return index.history.find((h) => h.version === v)?.name ?? `v${v}`;
 }
 
 export function readVersion(v: number): CardData {
