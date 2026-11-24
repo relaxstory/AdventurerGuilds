@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { GameConfig, HonorDraw, HonorMode } from "../../../engine/src/index.js";
 import { builtAt } from "../data.js";
+import { Rules } from "./Rules.js";
 
 export function Setup({ onStart, error }: { onStart: (c: GameConfig) => void; error: string | null }) {
   const [names, setNames] = useState(["玩家一", "玩家二", "玩家三", "玩家四"]);
@@ -8,10 +9,15 @@ export function Setup({ onStart, error }: { onStart: (c: GameConfig) => void; er
   const [honorDraw, setHonorDraw] = useState<HonorDraw>("balanced");
   const [includeTest, setIncludeTest] = useState(true);
   const [seed, setSeed] = useState(() => String(Math.floor(Math.random() * 1_000_000)));
+  const [showRules, setShowRules] = useState(false);
 
   return (
     <div className="setup">
-      <h1>冒險者公會　測試模式</h1>
+      <div className="setup-head">
+        <h1>冒險者公會　測試模式</h1>
+        <button onClick={() => setShowRules(true)}>簡易規則</button>
+      </div>
+      {showRules && <Rules onClose={() => setShowRules(false)} />}
       <p className="muted">一個人在同一個畫面操作 4 個公會，用來試玩規則與卡片。卡片資料版本：{builtAt.slice(0, 16).replace("T", " ")}</p>
       <section>
         <h2>玩家</h2>

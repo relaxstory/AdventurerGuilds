@@ -98,7 +98,9 @@ fieldset { border: 1px solid var(--line); border-radius: 8px; margin: 8px 0; }
   padding-right: max(16px, env(safe-area-inset-right, 0px));
 }
 .setup section { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; margin: 12px 0; }
-.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; }
+.grid2 input { width: 100%; min-width: 0; }
+.setup section { min-width: 0; }
 
 .topbar {
   position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5;
@@ -182,6 +184,14 @@ main section { background: var(--panel); border: 1px solid var(--line); border-r
 .pending h3 { color: var(--accent); margin-top: 0; }
 .dialog-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.45); display: grid; place-items: center; z-index: 10; padding: 16px; }
 .dialog { background: var(--panel); border-radius: 12px; padding: 16px; width: min(520px, 100%); max-height: 90vh; overflow: auto; }
+.setup-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.dialog.rules { width: min(720px, 100%); }
+.rules-head { display: flex; justify-content: space-between; align-items: center; position: sticky; top: -16px; background: var(--panel); padding-block: 8px; }
+.rules h3 { color: var(--accent); margin-top: 16px; }
+.rules p, .rules li, .rules dd { max-width: 65ch; }
+.rules ol, .rules ul { padding-left: 1.4em; margin: 4px 0; }
+.rules dt { font-weight: 700; margin-top: 6px; }
+.rules dd { margin: 0 0 0 1em; color: var(--ink); }
 .pick-list { display: flex; flex-direction: column; max-height: 240px; overflow: auto; }
 
 .log { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px; height: calc(100vh - 90px); overflow: auto; position: sticky; top: calc(env(safe-area-inset-top, 0px) + 64px); min-width: 0; }

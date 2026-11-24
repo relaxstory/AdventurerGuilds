@@ -20,6 +20,7 @@ import {
 import { honorText } from "../data.js";
 import { AdventurerCard, ItemCard, TaskCard } from "./Cards.js";
 import { ActivateDialog, PendingPanel, UseItemDialog } from "./Dialogs.js";
+import { Rules } from "./Rules.js";
 
 type Act = (a: Action) => boolean;
 
@@ -48,6 +49,7 @@ export function GameView({
   const [task, setTask] = useState<string | null>(null);
   const [party, setParty] = useState<string[]>([]);
   const [confirmQuit, setConfirmQuit] = useState(false);
+  const [showRules, setShowRules] = useState(false);
 
   const blocked = !!state.pending;
   const dispatch = () => {
@@ -64,6 +66,7 @@ export function GameView({
           {state.phase === "guild" && `（公會行動剩 ${me.actionsLeft}）`}
         </div>
         <div className="row">
+          <button onClick={() => setShowRules(true)}>規則</button>
           <button onClick={undo} disabled={!canUndo} title="只能反悔沒有揭露新資訊的操作">反悔</button>
           {confirmQuit ? (
             <>
@@ -136,6 +139,7 @@ export function GameView({
         <Log state={state} />
       </div>
 
+      {showRules && <Rules onClose={() => setShowRules(false)} />}
       {activating && <ActivateDialog state={state} lib={lib} card={activating.card} skill={activating.skill} act={act} onClose={() => setActivating(null)} />}
       {usingItem && state.itemCards[usingItem] && <UseItemDialog state={state} lib={lib} item={usingItem} act={act} onClose={() => setUsingItem(null)} />}
     </div>
