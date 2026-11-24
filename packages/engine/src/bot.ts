@@ -4,6 +4,7 @@
  */
 import { adjustOptions, clauses, dispatchLimitProblem, mustDispatch, outcome, participants, participationProblem, salaryFor } from "./abilities.js";
 import { activatedSkills, activationImplemented } from "./activate.js";
+import { itemDef, sellPrice } from "./items.js";
 import { turnOptions } from "./dice.js";
 import { applyAction, baseDiceOf, stagingSlots, taskDef, upgradeCost, type Action, type ExpiryPenalty } from "./actions.js";
 import { RuleError } from "./errors.js";
@@ -102,6 +103,15 @@ function botDecision(state: GameState, lib: CardLibrary): Action {
   const pending = state.pending!;
   const who = state.players.find((x) => x.id === pending.player)!;
   if (pending.kind === "tapTarget") return { type: "decide", decision: { option: "tap", target: pending.targets[0]! } };
+  if (pending.kind === "chooseItem") return { type: "decide", decision: { option: "item", name: pending.options[0]! } };
+  if (pending.kind === "discardItem") {
+    const cheapest = [...pending.items].sort((a, b) => sellPrice(state, lib, who, a) - sellPrice(state, lib, who, b))[0]!;
+    return { type: "decide", decision: { option: "discard", target: cheapest } };
+  }
+  if (pending.kind === "givePlayer") {
+    const target = state.players.filter((x) => x.id !== who.id).sort((a, b) => b.reputation - a.reputation)[0]!;
+    return { type: "decide", decision: { option: "player", target: target.id } };
+  }
   const upright = who.adventurers.filter((u) => !state.adventurerCards[u]!.tapped).sort((a, b) => value(state, lib, a) - value(state, lib, b));
   if (upright.length) return { type: "decide", decision: { option: "tap", target: upright[0]! } };
   return { type: "decide", decision: { option: pending.kind === "tapOrPay" ? "pay" : "flip" } };
@@ -139,6 +149,8 @@ export function botAction(state: GameState, lib: CardLibrary): Action {
   const p = currentPlayer(state);
   switch (state.phase) {
     case "guild": {
+      const faith = p.items.filter((u) => state.itemCards[u]!.name === "火爪的信念");
+      if (faith.length >= 3) return { type: "useItem", item: faith[0]! };
       if (state.turnStartOpen) {
         const sleep = botActivation(state, lib, "start");
         if (sleep) return sleep;
@@ -183,6 +195,12 @@ export function botAction(state: GameState, lib: CardLibrary): Action {
         const choice: ExpiryPenalty = Math.abs(p.reputation) < 3 ? "reputation" : "gold";
         return { type: "choosePenalty", task: pending, penalty: choice };
       }
+      // 出售可以賣錢的道具（藥劑、炸藥、家書這類有效果的道具保留）
+      const sellable = p.items.find((u) => {
+        const def = itemDef(state, lib, u);
+        return !def.categories.includes("[狀態]") && lib.clauses(def).length === 0 && sellPrice(state, lib, p, u) > 0;
+      });
+      if (sellable) return { type: "sell", item: sellable };
       if (!p.upgraded && upgradeCost(p) <= p.gold - 2) return { type: "upgrade" };
       return { type: "endTurn" };
     }

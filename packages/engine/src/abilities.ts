@@ -8,7 +8,8 @@ import type { ClauseDef, CardLibrary, TaskDef } from "./defs.js";
 import { turnOptions } from "./dice.js";
 import { RuleError } from "./errors.js";
 import type { Rng } from "./rng.js";
-import type { GameState, Mission, PlayerState } from "./state.js";
+import { countCategory, consumeCategory, gainItem, splitList } from "./items.js";
+import type { GameState, Mission, Pending, PlayerState } from "./state.js";
 
 /** 已實作的技能模板。其餘模板在對應的開發批次完成（docs/development.md）。 */
 export const IMPLEMENTED = new Set([
@@ -29,7 +30,18 @@ export const IMPLEMENTED = new Set([
   "EFF_OPPONENT_TAP_OR_PAY", "EFF_OPPONENT_TAP_OR_FLIP", "EFF_TAP_WITH_TRAIT", "EFF_ADD_TOKENS_SELF", "TOKEN_PLACED_RISK",
   "EFF_REMOVE_TOKENS_SELF", "ADD_PARTICIPANT", "UNTARGETABLE_BY_TRAIT", "REDIRECT_TARGETING", "GUILD_UNTARGETABLE",
   "TARGET_COUNT_PLUS", "ON_FLIP_TAP_FLIPPER", "ON_RETURN_TAVERN_FLIP", "ON_FLIP_RECRUIT_SELF",
+  // M3-4a：道具
+  "ITEM_CONSUME", "EFF_BASE_DICE_ROUND", "EFF_NO_RESET_ROUND", "ITEM_TOKEN_TIER_RESULT", "CONSUME_ALL_TIER_GAIN",
+  "SUBSTITUTE_ITEM", "WHILE_HELD_NO_TAP_FIRST", "SELL_PRICE_MOD", "EXTRA_ITEM_SLOT", "ON_RECRUIT_GAIN_ITEM",
+  "ON_RECRUIT_GIVE_ITEM", "COMPLETE_GAIN_ITEM", "ON_ANY_COMPLETE_TAG_ITEM", "TURNEND_GAIN_ITEM", "EFF_GAIN_ITEM_CHOICE",
+  "EFF_CONVERT_ITEMS", "EFF_CREATE_ITEM_MOVE_TOKENS", "AFTER_ROLL_AUTO_SUCCESS",
 ]);
+
+/** 加入等待中的決定；已經有決定在等時排隊。 */
+export function pushPending(state: GameState, p: Pending): void {
+  if (state.pending) state.pendingQueue.push(p);
+  else state.pending = p;
+}
 
 type Log = (text: string) => void;
 
@@ -142,6 +154,10 @@ export function freeRecruit(state: GameState, lib: CardLibrary, p: PlayerState, 
 export function onRecruit(state: GameState, lib: CardLibrary, p: PlayerState, uid: string, log: Log): void {
   const name = faceOf(state, lib, uid).name;
   for (const c of clauses(state, lib, uid, "ON_RECRUIT_GAIN")) gain(p, amount(state, lib, uid, c.x), c.y, log, name);
+  for (const c of clauses(state, lib, uid, "ON_RECRUIT_GAIN_ITEM")) gainItem(state, lib, p, c.x, log);
+  for (const c of clauses(state, lib, uid, "ON_RECRUIT_GIVE_ITEM")) {
+    if (state.players.length > 1) pushPending(state, { kind: "givePlayer", player: p.id, item: c.x, source: uid });
+  }
 }
 
 // ── 派遣 ──
@@ -156,7 +172,12 @@ export function tapOnDispatch(state: GameState, lib: CardLibrary, uid: string, l
     return false;
   }
   if (has(state, lib, uid, "NO_TAP_DISPATCH")) return false;
-  if (has(state, lib, uid, "NO_TAP_FIRST_DISPATCH") && card.freeDispatchRound !== state.round) {
+  // 父親的家書：持有時，芙蕾雅每輪第一次被派遣時不需橫置
+  const owner = ownerOf(state, uid);
+  const letter = owner?.items.some((i) =>
+    lib.clauses(lib.item(state.itemCards[i]!.name)).some((c) => c.code === "WHILE_HELD_NO_TAP_FIRST" && sameName(c.x, name)),
+  );
+  if ((has(state, lib, uid, "NO_TAP_FIRST_DISPATCH") || letter) && card.freeDispatchRound !== state.round) {
     card.freeDispatchRound = state.round;
     log(`${name} 本輪第一次派遣，不需橫置`);
     return false;
@@ -219,7 +240,7 @@ export function flip(state: GameState, lib: CardLibrary, uid: string, flipper: s
     const targets = (target?.adventurers ?? []).filter(
       (u) => !state.adventurerCards[u]!.tapped && canTarget(state, lib, uid, owner.id, u),
     );
-    if (targets.length) state.pending = { kind: "tapTarget", player: owner.id, source: uid, targets };
+    if (targets.length) pushPending(state, { kind: "tapTarget", player: owner.id, source: uid, targets });
     else log(`${name} 沒有可以指定的目標，沒有效果`);
   }
   // 賴皮的勇者【賴著不走】：在酒館被翻面時，使其翻面的玩家立即額外招募他
@@ -358,6 +379,8 @@ export function dicePool(state: GameState, lib: CardLibrary, m: Mission, def: Ta
   let total = 0;
   for (const uid of party) {
     let base = m.baseDice[uid] ?? Math.max(0, faceOf(state, lib, uid).baseDice ?? 0);
+    const roundDelta = state.adventurerCards[uid]!.roundBaseDelta;
+    if (roundDelta?.round === state.round) base += roundDelta.delta;
     for (const c of clauses(state, lib, uid, "TASK_BASE_DICE")) if (taskMatches(c.x, def, attempts)) base += amount(state, lib, uid, c.y);
     let dice = Math.max(0, base);
     for (const c of clauses(state, lib, uid, "DICE_PER_TOKEN")) dice += amount(state, lib, uid, c.x) * amount(state, lib, uid, c.y);
@@ -427,6 +450,10 @@ export function onSettle(
     const name = faceOf(state, lib, uid).name;
     if (ctx.success) {
       for (const c of clauses(state, lib, uid, "COMPLETE_GAIN")) if (taskMatches(c.x, def, attempts)) gain(p, amount(state, lib, uid, c.y), c.z, log, name);
+      for (const c of clauses(state, lib, uid, "COMPLETE_GAIN_ITEM")) {
+        const options = splitList(c.y).filter((n) => lib.items.has(n));
+        if (taskMatches(c.x, def, attempts) && options.length) pushPending(state, { kind: "chooseItem", player: p.id, options, optional: true, source: uid });
+      }
     }
     for (const c of clauses(state, lib, uid, "SETTLE_PARITY_GAIN")) {
       const even = ctx.faceSum % 2 === 0;
@@ -438,6 +465,20 @@ export function onSettle(
       if ((ctx.waivedBy[uid] ?? 0) >= amount(state, lib, uid, c.x)) {
         state.adventurerCards[uid]!.tapped = true;
         log(`${name} 免除了 ${ctx.waivedBy[uid]} 名冒險者的薪資，橫置`);
+      }
+    }
+  }
+  // 薩姆【野火蔓延】：任何玩家完成特定標籤的任務時，擁有者可以選擇獲得道具
+  if (ctx.success) {
+    for (const owner of state.players) {
+      for (const uid of owner.adventurers) {
+        for (const c of clauses(state, lib, uid, "ON_ANY_COMPLETE_TAG_ITEM")) {
+          const tags = splitList(c.x);
+          const options = splitList(c.y).filter((n) => lib.items.has(n));
+          if (tags.some((t) => taskMatches(t, def, attempts)) && options.length) {
+            pushPending(state, { kind: "chooseItem", player: owner.id, options, optional: true, source: uid });
+          }
+        }
       }
     }
   }
@@ -458,6 +499,14 @@ export function onSettle(
 // ── 回合結束與輪末 ──
 
 export function onTurnEnd(state: GameState, lib: CardLibrary, p: PlayerState, log: Log): void {
+  // 比爾、凱莉：回合結束時獲得道具（先判斷直立條件，再處理會橫置的效果）
+  for (const uid of p.adventurers) {
+    const upright = !state.adventurerCards[uid]!.tapped;
+    for (const c of clauses(state, lib, uid, "TURNEND_GAIN_ITEM")) {
+      if (c.x.includes("直立") && !upright) continue;
+      for (let i = 0; i < amount(state, lib, uid, c.y); i++) gainItem(state, lib, p, c.z, log);
+    }
+  }
   for (const uid of p.adventurers) {
     const card = state.adventurerCards[uid]!;
     for (const c of clauses(state, lib, uid, "TURNEND_IF_UPRIGHT_TAP_PAY")) {
@@ -488,6 +537,7 @@ export function onRoundEnd(state: GameState, lib: CardLibrary, log: (player: Pla
 
 /** 輪末結算第 2 步：是否重置。 */
 export function resetsAtRoundEnd(state: GameState, lib: CardLibrary, uid: string): boolean {
+  if (state.adventurerCards[uid]!.noResetRound === state.round) return false;
   return !has(state, lib, uid, "NO_ROUND_RESET");
 }
 
@@ -534,7 +584,9 @@ export type Adjustment =
   /** 馬文【加注】：重擲點數最大（至少 X）或最小（至多 X）的 count 顆骰子。 */
   | { readonly kind: "gamble"; readonly card: string; readonly count: number }
   /** 喀嘣小嗶：結果值調整 delta。 */
-  | { readonly kind: "adjustResult"; readonly card: string; readonly delta: number };
+  | { readonly kind: "adjustResult"; readonly card: string; readonly delta: number }
+  /** 兜的和弦：消耗道具，使本次任務視為成功。 */
+  | { readonly kind: "autoSuccess"; readonly card: string };
 
 const ADJUST_CODE: Record<Adjustment["kind"], string> = {
   reroll: "AFTER_ROLL_REROLL",
@@ -542,6 +594,7 @@ const ADJUST_CODE: Record<Adjustment["kind"], string> = {
   remove: "AFTER_ROLL_REMOVE_DICE",
   gamble: "GAMBLE_REROLL",
   adjustResult: "RESULT_ADJUST",
+  autoSuccess: "AFTER_ROLL_AUTO_SUCCESS",
 };
 
 export interface AdjustOption {
@@ -580,6 +633,15 @@ export function adjustOptions(state: GameState, lib: CardLibrary, m: Mission): A
     }
     for (const c of clauses(state, lib, uid, "RESULT_ADJUST")) {
       if (!used(c.code)) out.push({ card: uid, kind: "adjustResult", remaining: amount(state, lib, uid, c.x), mandatory: false });
+    }
+  }
+  // 兜的和弦：每次你派遣冒險者執行任務時（公會中的能力，不需參與）
+  const owner = state.players.find((p) => p.adventurers.includes(m.dispatched[0] ?? ""));
+  for (const uid of owner?.adventurers ?? []) {
+    for (const c of clauses(state, lib, uid, "AFTER_ROLL_AUTO_SUCCESS")) {
+      if (!m.autoSuccess && countCategory(state, lib, owner!, c.y) >= amount(state, lib, uid, c.x)) {
+        out.push({ card: uid, kind: "autoSuccess", remaining: 1, mandatory: false });
+      }
     }
   }
   return out;
@@ -643,6 +705,13 @@ export function applyAdjustment(state: GameState, lib: CardLibrary, rng: Rng, m:
       log(`${name}：結果值 ${adj.delta >= 0 ? "+" : ""}${adj.delta}`);
       break;
     }
+    case "autoSuccess": {
+      const owner = ownerOf(state, adj.card)!;
+      consumeCategory(state, lib, owner, amount(state, lib, adj.card, clause.x), clause.y, log);
+      m.autoSuccess = true;
+      log(`${name}：本次任務視為成功`);
+      break;
+    }
   }
 }
 
@@ -657,11 +726,12 @@ export function outcome(state: GameState, lib: CardLibrary, m: Mission): { faceS
   const def = lib.task(state.taskCards[m.task]!.defKey);
   const c = def.condition!;
   const faceSum = m.dice.reduce((a, b) => a + b, 0);
-  const result = faceSum + resultModifier(state, lib, m, def) + m.resultDelta;
+  const result = (faceSum + resultModifier(state, lib, m, def) + m.resultDelta) * m.resultTimes;
   const n = difficulty(state, lib, m, def);
   // 區間條件由玩家分配難度調整到兩端，等同於結果落在 [X−n, Y+n] 內即可
   const success =
-    c.op === "atLeast" ? result >= c.x - n : c.op === "atMost" ? result <= c.x + n : result >= c.x - n && result <= c.y + n;
+    m.autoSuccess ||
+    (c.op === "atLeast" ? result >= c.x - n : c.op === "atMost" ? result <= c.x + n : result >= c.x - n && result <= c.y + n);
   return { faceSum, result, n, success };
 }
 

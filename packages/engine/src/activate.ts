@@ -6,6 +6,7 @@ import { RULES } from "./constants.js";
 import type { CardLibrary, ClauseDef } from "./defs.js";
 import { RuleError } from "./errors.js";
 import type { Rng } from "./rng.js";
+import { consumeCategory, countCategory, discardItem, gainItem, splitList } from "./items.js";
 import type { GameState, PlayerState } from "./state.js";
 
 /** 發動主動能力時提供的參數，依效果而定。 */
@@ -22,20 +23,31 @@ export interface ActivateParams {
   readonly task?: string;
   /** 從酒館招募的位置（巴爾）。 */
   readonly tavernIndex?: number;
-  /** 放置的指示物數量（傑米）。 */
+  /** 放置的指示物數量（傑米）；轉換道具的數量（漢克）。 */
   readonly count?: number;
+  /** 要獲得的道具名稱（伊蓮娜）。 */
+  readonly item?: string;
 }
 
 export type Decision =
   | { readonly option: "tap"; readonly target: string }
   | { readonly option: "pay" }
-  | { readonly option: "flip" };
+  | { readonly option: "flip" }
+  /** 道具區超過上限：捨棄這個道具。 */
+  | { readonly option: "discard"; readonly target: string }
+  /** 選擇要獲得的道具。 */
+  | { readonly option: "item"; readonly name: string }
+  /** 不拿（選擇性的效果）。 */
+  | { readonly option: "skip" }
+  /** 選擇一名玩家。 */
+  | { readonly option: "player"; readonly target: string };
 
 type Log = (text: string) => void;
 
 const EFFECTS = new Set([
   "EFF_GAIN", "EFF_RESET", "EFF_FLIP_SELF", "EFF_RETRIEVE_TASK", "EFF_DISCARD_RECRUIT", "EFF_OPPONENT_TAP_OR_PAY",
   "EFF_OPPONENT_TAP_OR_FLIP", "EFF_TAP_WITH_TRAIT", "EFF_ADD_TOKENS_SELF", "EFF_REMOVE_TOKENS_SELF", "ADD_PARTICIPANT",
+  "EFF_GAIN_ITEM_CHOICE", "EFF_CONVERT_ITEMS", "EFF_CREATE_ITEM_MOVE_TOKENS",
 ]);
 
 /** 冒險者的主動能力：有 COST 子句的技能。回傳技能名稱 → 子句。 */
@@ -50,7 +62,7 @@ export function activatedSkills(state: GameState, lib: CardLibrary, uid: string)
 
 /** 這個主動能力是否已經實作（所有效果子句都已實作）。 */
 export function activationImplemented(clauses: readonly ClauseDef[]): boolean {
-  return clauses.every((c) => c.code === "COST" || c.code === "TIMING" || EFFECTS.has(c.code)) && !clauses.some((c) => c.code === "COST" && c.z);
+  return clauses.every((c) => c.code === "COST" || c.code === "TIMING" || EFFECTS.has(c.code));
 }
 
 const upright = (state: GameState, uid: string) => !state.adventurerCards[uid]!.tapped;
@@ -89,6 +101,11 @@ export function activate(state: GameState, lib: CardLibrary, rng: Rng, p: Player
   const goldCost = Number(cost.y || 0);
   if (tapCost && !upright(state, a.card)) throw new RuleError(`${name} 已經橫置，無法支付代價`);
   if (p.gold < goldCost) throw new RuleError(`金幣不足：需要 ${goldCost} 金`);
+  // 消耗道具作為代價，例如伊蓮娜「銷毀兩個 [藥材]」
+  const itemCost = cost.z.match(/^(\d+)\s*(.+)$/);
+  if (itemCost && countCategory(state, lib, p, itemCost[2]!) < Number(itemCost[1])) {
+    throw new RuleError(`${label}：需要 ${itemCost[1]} 個 ${itemCost[2]}`);
+  }
 
   // 先檢查效果的目標（沒有合法目標就不能發動，也不能先付代價）
   const max = 1 + ab.targetBonus(state, lib, p);
@@ -191,6 +208,32 @@ export function activate(state: GameState, lib: CardLibrary, rng: Rng, p: Player
           log(`${label}：移除所有${c.x}指示物`);
         });
         break;
+      case "EFF_GAIN_ITEM_CHOICE": {
+        const options = splitList(c.x);
+        if (!a.item || !options.includes(a.item)) throw new RuleError(`${label}：請選擇 ${options.join("、")} 其中一種`);
+        plan.push(() => gainItem(state, lib, p, a.item!, log));
+        break;
+      }
+      case "EFF_CONVERT_ITEMS": {
+        const limit = ab.amount(state, lib, a.card, c.x);
+        const n = a.count ?? Math.min(limit, countCategory(state, lib, p, c.y));
+        if (!Number.isInteger(n) || n < 1 || n > limit) throw new RuleError(`${label}：可以轉換 1～${limit} 個 ${c.y}`);
+        if (countCategory(state, lib, p, c.y) < n) throw new RuleError(`${label}：${c.y} 不足 ${n} 個`);
+        plan.push(() => {
+          consumeCategory(state, lib, p, n, c.y, log);
+          for (let i = 0; i < n; i++) gainItem(state, lib, p, c.z, log);
+        });
+        break;
+      }
+      case "EFF_CREATE_ITEM_MOVE_TOKENS":
+        plan.push(() => {
+          const card = state.adventurerCards[a.card]!;
+          const moved = card.tokens[c.y] ?? 0;
+          delete card.tokens[c.y];
+          gainItem(state, lib, p, c.x, log, moved ? { [c.y]: moved } : {});
+          if (moved) log(`${moved} 個${c.y}指示物轉移到【${c.x}】`);
+        });
+        break;
       case "ADD_PARTICIPANT": {
         const m = state.mission!;
         const targets = sameTargets(a.targets, ab.amount(state, lib, a.card, c.x) + max - 1, label);
@@ -213,6 +256,7 @@ export function activate(state: GameState, lib: CardLibrary, rng: Rng, p: Player
   // 支付代價，然後依序執行效果
   if (tapCost) state.adventurerCards[a.card]!.tapped = true;
   p.gold -= goldCost;
+  if (itemCost) consumeCategory(state, lib, p, Number(itemCost[1]), itemCost[2]!, log);
   log(`發動 ${label}${tapCost ? "，橫置" : ""}${goldCost ? `，支付 ${goldCost} 金` : ""}`);
   for (const step of plan) step();
 }
@@ -225,6 +269,20 @@ export function decide(state: GameState, lib: CardLibrary, d: Decision, log: (pl
   const say = (text: string) => log(who.id, text);
   const ownUpright = (t: string) => who.adventurers.includes(t) && !state.adventurerCards[t]!.tapped;
   state.pending = null;
+  resolveDecision(state, lib, pending, d, who, say, ownUpright);
+  // 下一個排隊中的決定
+  if (!state.pending && state.pendingQueue.length) state.pending = state.pendingQueue.shift()!;
+}
+
+function resolveDecision(
+  state: GameState,
+  lib: CardLibrary,
+  pending: NonNullable<GameState["pending"]>,
+  d: Decision,
+  who: PlayerState,
+  say: (text: string) => void,
+  ownUpright: (t: string) => boolean,
+): void {
   switch (pending.kind) {
     case "tapOrPay":
     case "tapOrFlip": {
@@ -251,6 +309,27 @@ export function decide(state: GameState, lib: CardLibrary, d: Decision, log: (pl
       if (d.option !== "tap" || !pending.targets.includes(d.target)) throw new RuleError("請從可以指定的冒險者中選擇");
       state.adventurerCards[d.target]!.tapped = true;
       say(`${ab.faceOf(state, lib, pending.source).name}：橫置 ${ab.faceOf(state, lib, d.target).name}`);
+      break;
+    }
+    case "discardItem": {
+      if (d.option !== "discard" || !pending.items.includes(d.target)) throw new RuleError("道具區已滿，請選擇一個道具捨棄");
+      discardItem(state, lib, who, d.target, say);
+      break;
+    }
+    case "chooseItem": {
+      if (d.option === "skip" && pending.optional) {
+        say("選擇不拿道具");
+        break;
+      }
+      if (d.option !== "item" || !pending.options.includes(d.name)) throw new RuleError(`請選擇 ${pending.options.join("、")} 其中一種`);
+      gainItem(state, lib, who, d.name, say);
+      break;
+    }
+    case "givePlayer": {
+      const target = state.players.find((x) => x.id === (d.option === "player" ? d.target : ""));
+      if (!target || target.id === who.id) throw new RuleError("請選擇一名其他玩家");
+      gainItem(state, lib, target, pending.item, say);
+      say(`把【${pending.item}】放在 ${target.name} 面前`);
       break;
     }
   }

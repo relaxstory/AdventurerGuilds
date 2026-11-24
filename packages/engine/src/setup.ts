@@ -97,6 +97,7 @@ export function createGame(config: GameConfig, source: CardSource): GameState {
     staging: [],
     formal: [],
     completed: [],
+    items: [],
     assignedHonors: assigned[i] ?? [],
   }));
 
@@ -121,6 +122,10 @@ export function createGame(config: GameConfig, source: CardSource): GameState {
     taskDiscard: [],
     honors: table,
     pending: null,
+    pendingQueue: [],
+    itemCards: {},
+    itemSeq: 0,
+    uniquesCreated: [],
     turnStartOpen: true,
     mission: null,
     pendingExpiry: [],

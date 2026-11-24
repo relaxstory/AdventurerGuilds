@@ -1,5 +1,6 @@
 import * as ab from "./abilities.js";
 import { activate, activatedSkills, decide, type ActivateParams, type Decision } from "./activate.js";
+import { sellItem, useItem, type UseItemParams } from "./items.js";
 import { RULES } from "./constants.js";
 import type { CardLibrary, TaskDef } from "./defs.js";
 import { RuleError } from "./errors.js";
@@ -26,6 +27,10 @@ export type Action =
   | { readonly type: "endAdventurePhase" }
   /** 自己的回合：發動主動能力。 */
   | ({ readonly type: "activate" } & ActivateParams)
+  /** 自己的回合：使用道具。 */
+  | ({ readonly type: "useItem" } & UseItemParams)
+  /** 公會整理階段：出售道具。 */
+  | { readonly type: "sell"; readonly item: string }
   /** 回應等待中的決定（由 state.pending.player 做出）。 */
   | { readonly type: "decide"; readonly decision: Decision }
   /** 公會整理階段：逾期懲罰金幣與聲望都能付時，由玩家選擇。 */
@@ -142,6 +147,18 @@ export function applyAction(prev: GameState, action: Action, lib: CardLibrary): 
 
     case "activate": {
       activate(state, lib, rng, p, action, log);
+      break;
+    }
+
+    case "useItem": {
+      useItem(state, lib, p, action, log);
+      break;
+    }
+
+    case "sell": {
+      need("cleanup", "公會整理階段");
+      requireExpiriesResolved(state, lib);
+      sellItem(state, lib, p, action.item, log);
       break;
     }
 
@@ -272,7 +289,7 @@ function startMission(state: GameState, lib: CardLibrary, p: PlayerState, taskUi
   log(`派遣 ${names} 執行「${def.name}」，支付薪資 ${salary} 金`);
   state.mission = {
     task: taskUid, dispatched: [...party], joined: [], salary, stage: "assemble", dice: [], pool: 0, removedBy: {},
-    predictions: {}, baseDice: {}, used: {}, turned: {}, resultDelta: 0, gamble: null,
+    predictions: {}, baseDice: {}, used: {}, turned: {}, resultDelta: 0, resultTimes: 1, autoSuccess: false, gamble: null,
   };
 }
 

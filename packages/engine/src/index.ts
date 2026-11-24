@@ -1,6 +1,6 @@
 export { Rng, type RngState } from "./rng.js";
 export { turnOptions, adjustCondition, meetsCondition, type Condition } from "./dice.js";
-export { CardLibrary, taskKey, type AdventurerDef, type TaskDef, type HonorDef, type CardSource } from "./defs.js";
+export { CardLibrary, taskKey, type AdventurerDef, type TaskDef, type HonorDef, type ItemDef, type CardSource, type ClauseRow } from "./defs.js";
 export { RULES } from "./constants.js";
 export { RuleError } from "./errors.js";
 export * from "./state.js";
@@ -30,3 +30,4 @@ export {
 } from "./abilities.js";
 export { activate, activatedSkills, activationImplemented, decide, type ActivateParams, type Decision } from "./activate.js";
 export { canTarget } from "./abilities.js";
+export { gainItem, itemSlots, sellPrice, useItem, type UseItemParams } from "./items.js";

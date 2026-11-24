@@ -5,6 +5,7 @@ export const RULES = {
   startReputation: 0,
   guildActions: 3,
   adventurerCapacity: 5,
+  itemSlots: 3,
   stagingSlots: { base: 1, upgraded: 2 },
   boardSize: 5,
   tavernSize: 5,

@@ -27,6 +27,14 @@ export interface TaskDef {
   readonly status: string;
 }
 
+export interface ItemDef {
+  readonly id: string;
+  readonly name: string;
+  readonly categories: readonly string[];
+  readonly price: number | null;
+  readonly status: string;
+}
+
 export interface HonorDef {
   readonly id: string;
   readonly name: string;
@@ -61,6 +69,7 @@ export interface CardSource {
   readonly adventurers: readonly AdventurerDef[];
   readonly tasks: readonly TaskDef[];
   readonly honors: readonly HonorDef[];
+  readonly items?: readonly ItemDef[];
   readonly clauses?: readonly ClauseRow[];
 }
 
@@ -69,6 +78,8 @@ export class CardLibrary {
   readonly adventurers = new Map<string, AdventurerDef>();
   readonly tasks = new Map<string, TaskDef>();
   readonly honors = new Map<string, HonorDef>();
+  /** 道具：以名稱查詢（卡片文字以名稱引用道具）。 */
+  readonly items = new Map<string, ItemDef>();
   readonly adventurerPool: string[] = [];
   readonly taskPool: string[] = [];
   readonly epicPool: string[] = [];
@@ -98,6 +109,7 @@ export class CardLibrary {
       if (!usable(t.status)) continue;
       (t.type === "史詩" ? this.epicPool : this.taskPool).push(key);
     }
+    for (const i of source.items ?? []) if (usable(i.status)) this.items.set(i.name, i);
     for (const h of source.honors) {
       this.honors.set(h.id, h);
       if (usable(h.status) && h.kind === "排名型") this.honorPool.push(h.id);
@@ -118,6 +130,12 @@ export class CardLibrary {
   task(key: string): TaskDef {
     const d = this.tasks.get(key);
     if (!d) throw new Error(`找不到任務 ${key}`);
+    return d;
+  }
+
+  item(name: string): ItemDef {
+    const d = this.items.get(name);
+    if (!d) throw new Error(`找不到道具 ${name}`);
     return d;
   }
 

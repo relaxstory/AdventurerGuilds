@@ -30,8 +30,19 @@ export interface AdventurerCard {
   tokens: Record<string, number>;
   /** 本輪已經用過「每輪第一次派遣不橫置」的輪次。 */
   freeDispatchRound?: number;
+  /** 本輪的基礎骰數修正（藥劑、紅斑菌菇）。 */
+  roundBaseDelta?: { round: number; delta: number };
+  /** 本輪輪末無法重置（紅斑菌菇）。 */
+  noResetRound?: number;
   /** 本輪被派遣的次數：輪次識別與次數。 */
   dispatches?: { turn: string; count: number };
+}
+
+export interface ItemCard {
+  readonly uid: string;
+  /** 道具名稱。 */
+  readonly name: string;
+  tokens: Record<string, number>;
 }
 
 /** 進行中的派遣（docs/spec.md 7.1）。組隊 → 擲骰 → 調整 → 結算。 */
@@ -58,6 +69,10 @@ export interface Mission {
   turned: Record<string, number[]>;
   /** 結果值的調整（喀嘣小嗶）。 */
   resultDelta: number;
+  /** 結果值倍數（希氏炸藥：兩倍）。 */
+  resultTimes: number;
+  /** 視為成功（兜的和弦）。 */
+  autoSuccess: boolean;
   /** 馬文【加注】：加注時任務是否已經成功、重擲了幾顆。 */
   gamble: { uid: string; count: number; successBefore: boolean } | null;
 }
@@ -90,6 +105,7 @@ export interface PlayerState {
   staging: string[];
   formal: FormalTask[];
   completed: string[];
+  items: string[];
   /** 王國指派模式：分到的王國榮譽卡。 */
   assignedHonors: string[];
 }
@@ -106,7 +122,13 @@ export type Pending =
   /** 里諾【你好，我可以逮捕你嗎？】：橫置自己公會中的一名直立冒險者，或將 source 翻面。 */
   | { readonly kind: "tapOrFlip"; readonly player: string; readonly from: string; readonly source: string }
   /** 狂人里諾【我給過你機會了】：從 targets 中選一名冒險者橫置。 */
-  | { readonly kind: "tapTarget"; readonly player: string; readonly source: string; readonly targets: readonly string[] };
+  | { readonly kind: "tapTarget"; readonly player: string; readonly source: string; readonly targets: readonly string[] }
+  /** 道具區超過上限：從 items 中選一個捨棄。 */
+  | { readonly kind: "discardItem"; readonly player: string; readonly items: readonly string[] }
+  /** 選擇要獲得的道具；optional 為 true 時可以不拿。 */
+  | { readonly kind: "chooseItem"; readonly player: string; readonly options: readonly string[]; readonly optional: boolean; readonly source: string }
+  /** 選擇一名其他玩家，把道具放在他面前（梅里妲的注視）。 */
+  | { readonly kind: "givePlayer"; readonly player: string; readonly item: string; readonly source: string };
 
 export interface LogEntry {
   readonly round: number;
@@ -150,6 +172,13 @@ export interface GameState {
   honors: string[];
   /** 等待某位玩家做決定。 */
   pending: Pending | null;
+  /** 排隊中的決定：目前的決定完成後依序處理。 */
+  pendingQueue: Pending[];
+  itemCards: Record<string, ItemCard>;
+  /** 道具編號的流水號。 */
+  itemSeq: number;
+  /** 已經出現過的【獨特】道具（整場遊戲只有一份，銷毀後也不會再出現）。 */
+  uniquesCreated: string[];
   /** 回合開始的時機：回合開始後、做任何其他操作之前（凱菲【我先睡一下……】）。 */
   turnStartOpen: boolean;
   /** 冒險階段：進行中的派遣。 */
