@@ -9,7 +9,8 @@
 
 | 位置 | 內容 |
 |---|---|
-| `packages/engine` | 規則引擎（純邏輯，不碰網路與資料庫）。目前有固定種子亂數、擲骰、難度調整與判定 |
+| `packages/engine` | 規則引擎（純邏輯，不碰網路與資料庫）。`applyAction(狀態, 操作)` 回傳新狀態；包含開局、公會／冒險／整理階段、輪末、王國榮譽計分與 AI 玩家 |
+| `scripts/simulate.ts` | 多局模擬統計 |
 | `packages/cards` | 卡片資料管線：讀取試算表、轉成資料、檢查、比對差異、發布版本 |
 | `data/raw/` | 試算表各分頁的 CSV 快照 |
 | `data/cards.json` | 由快照產生的卡片資料（工作版本，尚未發布） |
@@ -26,6 +27,7 @@
 |---|---|
 | `npm run check` | 型別檢查加上全部測試 |
 | `npm test` | 執行測試 |
+| `npm run sim -- 200` | 用 AI 玩家跑 200 局模擬，統計整體數據 |
 | `npm run cards:update` | 從 Google 試算表下載最新內容，產生卡片資料與檢查報告 |
 | `npm run cards:build` | 不下載，只用 `data/raw/` 的快照重新產生 |
 | `npm run cards:publish -- --name alpha1.0` | 把目前的卡片資料發布為新版本，`--name` 為版本名稱（省略時為 v1、v2…）。有錯誤時會拒絕發布 |
@@ -43,6 +45,25 @@
    - **技能數值變更**：只改數字時，子句對照表會自動更新；句型改變時標示「需要確認」，由 Claude 檢查子句。
 3. 技能沒有對應模板時，Claude 在 `data/skill-mapping.csv` 加上子句；需要新機制時，在 `tools/skill_templates.py` 新增模板並開發程式。
 4. 設計者確認後，執行 `npm run cards:publish`。
+
+## 規則引擎
+
+| 檔案 | 內容 |
+|---|---|
+| `setup.ts` | 開局：依卡池組成牌庫、抽王國榮譽卡 |
+| `actions.ts` | 玩家操作：招募、接任務、派遣、逾期懲罰、升級、結束回合；輪末結算 |
+| `honors.ts` | 王國榮譽的評選方式與終局計分 |
+| `bot.ts` | 簡單的 AI 玩家與整局模擬 |
+
+### 玩家操作
+
+| 階段 | 操作 |
+|---|---|
+| 公會階段 | `recruit`（招募，可指定解僱對象）、`acceptTask`（接任務）、`endGuildPhase` |
+| 冒險階段 | `dispatch`（派遣）、`endAdventurePhase`（進入整理階段，自動處理時限與逾期） |
+| 公會整理階段 | `choosePenalty`（逾期懲罰需要選擇時）、`upgrade`（升級公會）、`endTurn` |
+
+尚未實作（M3）：卡片能力、新兵小隊、道具與出售、衍生物、史詩任務背面效果。
 
 ## 測試
 
