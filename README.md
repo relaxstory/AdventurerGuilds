@@ -9,3 +9,4 @@
 - [技能模板清單](docs/skill-templates.md)
 - [任務難度參考](docs/task-difficulty.md)
 - [王國榮譽卡候選清單](docs/honor-cards.md)
+- [任務數值建議](docs/task-proposals.md)
