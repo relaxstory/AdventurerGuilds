@@ -19,5 +19,7 @@ export const RULES = {
   upgrade: { freeAtCompleted: 4, discountReputation: 5, discountCost: 3, cost: 7 },
   /** 輪末補助：金幣少於此數的玩家補到此數（最後一輪不執行）。 */
   roundEndGoldFloor: 3,
+  /** 任務供應方式：deckTop＝可以從公告欄或任務牌庫頂拿取（docs/spec.md 6.3）。 */
+  taskSupply: "deckTop" as "board" | "deckTop" | "refill",
   distrust: { max: 3, goldPenalty: [0, 1, 2, 3] },
 } as const;

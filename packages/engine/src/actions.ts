@@ -177,7 +177,7 @@ export function applyAction(prev: GameState, action: Action, lib: CardLibrary): 
       if (p.staging.length >= stagingSlots(p)) throw new RuleError("任務暫存格已滿");
       let uid: string | null | undefined;
       if ("fromDeck" in action) {
-        if (state.config.taskSupply !== "deckTop") throw new RuleError("目前的規則不能從任務牌庫拿取");
+        if ((state.config.taskSupply ?? RULES.taskSupply) !== "deckTop") throw new RuleError("目前的規則不能從任務牌庫拿取");
         uid = state.taskDeck.shift();
         if (!uid) throw new RuleError("任務牌庫已經沒有牌");
       } else {
@@ -187,7 +187,7 @@ export function applyAction(prev: GameState, action: Action, lib: CardLibrary): 
       }
       p.staging.push(uid);
       p.actionsLeft -= 1;
-      log(`接取任務「${taskDef(state, lib, uid).name}」`);
+      log(`接取任務「${taskDef(state, lib, uid).name}」${"fromDeck" in action ? "（任務牌庫頂）" : ""}`);
       break;
     }
 
@@ -500,7 +500,7 @@ function beginTurn(state: GameState, lib: CardLibrary): void {
   const p = currentPlayer(state);
   p.actionsLeft = RULES.guildActions;
   p.missionsThisTurn = 0;
-  if (state.config.taskSupply === "refill") {
+  if ((state.config.taskSupply ?? RULES.taskSupply) === "refill") {
     // 試驗方案「回合開始補滿」：公告欄的空位從任務牌庫補滿
     state.board = state.board.map((uid) => uid ?? state.taskDeck.shift() ?? null);
   }

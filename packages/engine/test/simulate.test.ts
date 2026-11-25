@@ -58,10 +58,11 @@ describe("輪末補助", () => {
 });
 
 describe("任務供應試驗方案", () => {
-  it("牌庫頂：可以拿任務牌庫最上面的一張；預設規則不行", () => {
-    const s = simulate(config({ seed: 3, taskSupply: "deckTop", includeEpic: false, includeTest: true }), published);
+  it("牌庫頂（預設）：可以拿任務牌庫最上面的一張；只用公告欄的規則不行", () => {
+    const s = simulate(config({ seed: 3, includeEpic: false, includeTest: true }), published);
+    expect(s.log.some((l) => l.text.startsWith("接取任務"))).toBe(true);
     expect(s.phase).toBe("gameOver");
-    const base = createGame(config({ seed: 3 }), published);
+    const base = createGame(config({ seed: 3, taskSupply: "board" }), published);
     expect(() => applyAction(base, { type: "acceptTask", fromDeck: true }, new CardLibrary(published, false))).toThrow(RuleError);
   });
   it("回合開始補滿：每個玩家回合開始時公告欄沒有空位（牌庫還有牌時）", () => {

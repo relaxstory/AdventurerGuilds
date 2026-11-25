@@ -121,7 +121,12 @@ export function GameView({
                 ),
               )}
             </div>
-            <p className="muted">任務牌庫剩 {state.taskDeck.length} 張</p>
+            <p className="muted">
+              任務牌庫剩 {state.taskDeck.length} 張
+              {state.phase === "guild" && !blocked && state.taskDeck.length > 0 && (state.config.taskSupply ?? RULES.taskSupply) === "deckTop" && (
+                <> <button onClick={() => act({ type: "acceptTask", fromDeck: true })}>接取牌庫頂的任務</button></>
+              )}
+            </p>
           </section>
           <section>
             <h2>綠龍酒館</h2>

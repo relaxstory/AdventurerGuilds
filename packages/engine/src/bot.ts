@@ -2,6 +2,7 @@
  * 簡單的 AI 玩家：用來自動跑完整局、驗證規則與做平衡模擬。
  * 策略刻意保持單純，不代表最佳玩法。
  */
+import { RULES } from "./constants.js";
 import { adjustOptions, clauses, dispatchLimitProblem, squadKeyword, unitBaseDice, mustDispatch, outcome, participants, participationProblem, salaryFor } from "./abilities.js";
 import { activatedSkills, activationImplemented } from "./activate.js";
 import { itemDef, sellPrice } from "./items.js";
@@ -187,7 +188,7 @@ export function botAction(state: GameState, lib: CardLibrary): Action {
           if (score > bestScore) [best, bestScore] = [i, score];
         });
         if (best >= 0) return { type: "acceptTask", boardIndex: best };
-        if (state.config.taskSupply === "deckTop" && state.taskDeck.length) return { type: "acceptTask", fromDeck: true };
+        if ((state.config.taskSupply ?? RULES.taskSupply) === "deckTop" && state.taskDeck.length) return { type: "acceptTask", fromDeck: true };
       }
       if (p.adventurers.length < 5 && recruitIndex >= 0) return { type: "recruit", tavernIndex: recruitIndex };
       return { type: "endGuildPhase" };
