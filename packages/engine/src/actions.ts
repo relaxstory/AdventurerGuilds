@@ -282,6 +282,14 @@ export function applyAction(prev: GameState, action: Action, lib: CardLibrary): 
 
     case "roll": {
       const m = requireMission(state, "assemble");
+      // 擲骰前加入的冒險者使任務直接完成時（例如用「加入此次任務」加入的丹妮絲），不擲骰
+      if (ab.completesDirectly(state, lib, m)) {
+        ab.onParticipate(state, lib, p, m, log);
+        m.stage = "adjust";
+        m.autoSuccess = true;
+        resolveMission(state, lib, p, m, log);
+        break;
+      }
       ab.applyRollChoices(state, lib, m, action);
       rollMission(state, lib, rng, p, m, log);
       break;

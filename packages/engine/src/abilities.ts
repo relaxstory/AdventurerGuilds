@@ -17,6 +17,7 @@ import type { GameState, Mission, Pending, PlayerState } from "./state.js";
 export const IMPLEMENTED = new Set([
   "COND_HAS_CARDS",
   "NO_ROUND_RESET", "NO_TAP_FIRST_DISPATCH", "NO_TAP_DISPATCH", "DISPATCH_ADD_TOKEN_NO_TAP", "REPEAT_PERMANENT_TASK",
+  "PARTICIPATE_AUTO_COMPLETE", "AFTER_MISSION_DESTROY_PARTICIPANT", "PREVENT_OWN_DESTRUCTION",
   "DICE_PER_TOKEN", "TOKEN_THRESHOLD_FLIP", "DISPATCH_LIMIT_PER_TURN", "CANNOT_BE_FIRED", "NOT_COUNT_CAPACITY",
   "CANNOT_PARTICIPATE_WITH", "COUNTS_AS_RACE", "ANY_PROFESSION", "FREE_RECRUIT_IF_NAME", "MUST_PARTICIPATE_FIRST",
   "TASK_DIFFICULTY", "WITH_CARD_DIFFICULTY", "WITH_PROFESSION_DICE", "WITH_CARD_DICE", "TASK_BASE_DICE",
@@ -548,7 +549,8 @@ export function onSettle(
         if (taskMatches(c.x, def, attempts) && options.length) pushPending(state, { kind: "chooseItem", player: p.id, options, optional: true, source: uid });
       }
     }
-    for (const c of clauses(state, lib, uid, "SETTLE_PARITY_GAIN")) {
+    // 沒有擲骰（直接完成）時，和骰子有關的效果都不觸發
+    for (const c of m.dice.length ? clauses(state, lib, uid, "SETTLE_PARITY_GAIN") : []) {
       const even = ctx.faceSum % 2 === 0;
       if ((c.x === "偶數") === even) gain(p, amount(state, lib, uid, c.y), c.z, log, name);
     }
@@ -891,6 +893,8 @@ export function taskRewardItems(state: GameState, lib: CardLibrary, taskUid: str
 /** 送錯的軍令：派遣具有特定特質的冒險者參與時，可直接完成此任務（不擲骰）。 */
 export function completesDirectly(state: GameState, lib: CardLibrary, m: Mission): boolean {
   const def = lib.task(state.taskCards[m.task]!.defKey);
+  // 丹妮絲【吞噬一切】：參與任務時，無視任務目標直接完成（不擲骰）
+  if (participants(m).some((u) => has(state, lib, u, "PARTICIPATE_AUTO_COMPLETE"))) return true;
   return lib.clauses(def).some(
     (t) => t.code === "TASK_AUTO_COMPLETE_TRAIT" && m.dispatched.some((u) => faceOf(state, lib, u).traits.some((x) => bare(x) === bare(t.x))),
   );
@@ -898,6 +902,7 @@ export function completesDirectly(state: GameState, lib: CardLibrary, m: Mission
 
 /** 預言與加注的結算。 */
 export function onSettleChoices(state: GameState, lib: CardLibrary, p: PlayerState, m: Mission, result: number, success: boolean, log: Log): void {
+  if (!m.dice.length) return; // 沒有擲骰（直接完成）時，預言與加注都不結算
   for (const [uid, guess] of Object.entries(m.predictions)) {
     const name = faceOf(state, lib, uid).name;
     const actual = Math.abs(result) % 2 === 0 ? "even" : "odd";

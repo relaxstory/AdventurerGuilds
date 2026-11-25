@@ -163,9 +163,10 @@ describe("擲骰與結算", () => {
     const t = take(state, "STD-M04");
     const def = lib.task(state.taskCards[t]!.defKey);
     const p = currentPlayer(state);
-    ab.onSettle(state, lib, p, mission(t, [astra!]), def, { success: false, faceSum: 8, slot: null, emptyBefore: new Set(), waivedBy: {} }, () => {});
+    const rolled = { ...mission(t, [astra!]), dice: [4, 4] }; // 有擲骰（沒有擲骰時不觸發）
+    ab.onSettle(state, lib, p, rolled, def, { success: false, faceSum: 8, slot: null, emptyBefore: new Set(), waivedBy: {} }, () => {});
     expect(p.reputation).toBe(1);
-    ab.onSettle(state, lib, p, mission(t, [astra!]), def, { success: false, faceSum: 7, slot: null, emptyBefore: new Set(), waivedBy: {} }, () => {});
+    ab.onSettle(state, lib, p, { ...rolled, dice: [3, 4] }, def, { success: false, faceSum: 7, slot: null, emptyBefore: new Set(), waivedBy: {} }, () => {});
     expect(p.reputation).toBe(1);
   });
 

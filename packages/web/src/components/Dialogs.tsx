@@ -393,7 +393,11 @@ export function PendingPanel({ state, lib, act }: { state: GameState; lib: CardL
     case "destroyOwn":
       body = (
         <>
-          <p>【{itemName(pending.source)}】：請銷毀自己公會中的一名冒險者。</p>
+          <p>
+            {state.adventurerCards[pending.source]
+              ? `${ab.faceOf(state, lib, pending.source).name}【我很抱歉】：請銷毀一名參與這次任務的冒險者。`
+              : `【${itemName(pending.source)}】：請銷毀自己公會中的一名冒險者。`}
+          </p>
           <div className="row wrap">
             {pending.candidates.map((u) => (
               <button key={u} onClick={() => decide({ option: "destroy", target: u })}>銷毀 {ab.faceOf(state, lib, u).name}</button>

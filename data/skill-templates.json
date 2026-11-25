@@ -217,6 +217,27 @@
     "params": "X＝數量；Y＝指示物；Z＝任務類型限制（空白＝所有任務；永久＝只限參與永久任務）"
   },
   {
+    "code": "PARTICIPATE_AUTO_COMPLETE",
+    "name": "參與時直接完成任務",
+    "type": "常駐",
+    "text": "當此冒險者參與任務時，無視任務條件直接完成該任務。",
+    "params": "無（不擲骰；任務條件只指任務目標，人數與特質需求仍要遵守）"
+  },
+  {
+    "code": "AFTER_MISSION_DESTROY_PARTICIPANT",
+    "name": "參與後銷毀一名參與者",
+    "type": "觸發",
+    "text": "當此冒險者參與任務後，銷毀一個參與任務的冒險者。",
+    "params": "無（結算、領完獎勵之後；擁有者選擇；不含此冒險者；小隊為整隊；衍生物也可以）"
+  },
+  {
+    "code": "PREVENT_OWN_DESTRUCTION",
+    "name": "銷毀無效",
+    "type": "常駐",
+    "text": "當此冒險者將被銷毀時，使該次銷毀無效。",
+    "params": "無"
+  },
+  {
     "code": "REPEAT_PERMANENT_TASK",
     "name": "可重複參與永久任務",
     "type": "常駐",

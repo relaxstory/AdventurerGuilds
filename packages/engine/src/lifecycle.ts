@@ -58,6 +58,11 @@ export function finalizeDestroy(state: GameState, lib: CardLibrary, uid: string,
   const card = state.adventurerCards[uid];
   if (!owner || !card) return;
   const name = ab.faceOf(state, lib, uid).name;
+  // 迪倫【不死之身】：使該次銷毀無效（可以替代的情況會先詢問是否使用替代效果，由玩家決定）
+  if (ab.has(state, lib, uid, "PREVENT_OWN_DESTRUCTION")) {
+    log(`${name}【不死之身】：銷毀無效`);
+    return;
+  }
   owner.adventurers = owner.adventurers.filter((u) => u !== uid);
   if (card.derivative) {
     delete state.adventurerCards[uid]; // 衍生物回到衍生物牌組
@@ -144,6 +149,13 @@ export function afterSettle(state: GameState, lib: CardLibrary, p: PlayerState, 
   for (const r of resets) {
     const candidates = p.adventurers.filter((u) => state.adventurerCards[u]!.tapped);
     if (r.count > 0 && candidates.length) ab.pushPending(state, { kind: "resetAdventurers", player: p.id, source: r.source, count: r.count, candidates });
+  }
+  // 丹妮絲【我很抱歉】：參與任務後（結算、領完獎勵之後），由擁有者銷毀一名其他參與的冒險者（小隊為整隊；衍生物也可以）
+  for (const uid of party) {
+    if (!state.adventurerCards[uid] || !ab.has(state, lib, uid, "AFTER_MISSION_DESTROY_PARTICIPANT")) continue;
+    const owner = ab.ownerOf(state, uid);
+    const candidates = party.filter((u) => u !== uid && state.adventurerCards[u] && owner?.adventurers.includes(u));
+    if (owner && candidates.length) ab.pushPending(state, { kind: "destroyOwn", player: owner.id, source: uid, candidates });
   }
   // 彌的粉絲【已滿足♡♡♡！】：和彌一同參與的任務結算後銷毀
   for (const uid of party) {

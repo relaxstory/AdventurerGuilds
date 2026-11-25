@@ -168,7 +168,9 @@ function botDecision(state: GameState, lib: CardLibrary): Action {
   if (pending.kind === "extendTask") return { type: "decide", decision: { option: "task", target: pending.candidates[0]! } };
   if (pending.kind === "confirmReplace") return { type: "decide", decision: { option: pending.what === "adventurer" ? "yes" : "no" } };
   if (pending.kind === "destroyOwn") {
-    const pick = [...pending.candidates].sort((a, b) => Number(!!state.adventurerCards[b]!.derivative) - Number(!!state.adventurerCards[a]!.derivative) || value(state, lib, a) - value(state, lib, b))[0]!;
+    // 優先選銷毀無效的冒險者（迪倫），其次衍生物，再來是價值最低的
+    const immune = pending.candidates.find((u) => has(state, lib, u, "PREVENT_OWN_DESTRUCTION"));
+    const pick = immune ?? [...pending.candidates].sort((a, b) => Number(!!state.adventurerCards[b]!.derivative) - Number(!!state.adventurerCards[a]!.derivative) || value(state, lib, a) - value(state, lib, b))[0]!;
     return { type: "decide", decision: { option: "destroy", target: pick } };
   }
   if (pending.kind === "givePlayer") {
