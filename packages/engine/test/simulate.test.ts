@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { applyAction, CardLibrary, createGame, RuleError } from "../src/index.js";
 import { simulate } from "../src/bot.js";
 import type { HonorMode } from "../src/state.js";
 import { config, source } from "./fixture.js";
@@ -53,5 +54,24 @@ describe("輪末補助", () => {
       expect(off.log.some((l) => l.text.startsWith("輪末補助"))).toBe(false);
     }
     expect(total).toBeGreaterThan(0);
+  });
+});
+
+describe("任務供應試驗方案", () => {
+  it("牌庫頂：可以拿任務牌庫最上面的一張；預設規則不行", () => {
+    const s = simulate(config({ seed: 3, taskSupply: "deckTop", includeEpic: false, includeTest: true }), published);
+    expect(s.phase).toBe("gameOver");
+    const base = createGame(config({ seed: 3 }), published);
+    expect(() => applyAction(base, { type: "acceptTask", fromDeck: true }, new CardLibrary(published, false))).toThrow(RuleError);
+  });
+  it("回合開始補滿：每個玩家回合開始時公告欄沒有空位（牌庫還有牌時）", () => {
+    let s = createGame(config({ seed: 4, taskSupply: "refill" }), published);
+    const lib = new CardLibrary(published, false);
+    s = applyAction(s, { type: "acceptTask", boardIndex: 0 }, lib);
+    expect(s.board[0]).toBeNull();
+    s = applyAction(s, { type: "endGuildPhase" }, lib);
+    s = applyAction(s, { type: "endAdventurePhase" }, lib);
+    while (s.phase === "cleanup") s = applyAction(s, { type: "endTurn" }, lib);
+    if (s.taskDeck.length) expect(s.board.every(Boolean)).toBe(true);
   });
 });

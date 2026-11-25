@@ -21,6 +21,8 @@ export interface GameConfig {
   readonly rounds?: number;
   /** 輪末補助的金幣下限，預設 RULES.roundEndGoldFloor；0 表示關閉。 */
   readonly goldFloor?: number;
+  /** 任務供應方式（試驗中）：board＝只從公告欄拿；deckTop＝也可以拿牌庫頂；refill＝每個玩家回合開始時補滿公告欄。 */
+  readonly taskSupply?: "board" | "deckTop" | "refill";
 }
 
 export interface AdventurerCard {

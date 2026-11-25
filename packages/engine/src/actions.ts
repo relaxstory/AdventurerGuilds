@@ -24,6 +24,8 @@ export type Action =
     }
   /** 公會階段：接取公告欄第 boardIndex 張任務。 */
   | { readonly type: "acceptTask"; readonly boardIndex: number }
+  /** 試驗方案「牌庫頂」：直接拿任務牌庫最上面的一張。 */
+  | { readonly type: "acceptTask"; readonly fromDeck: true }
   | { readonly type: "endGuildPhase" }
   /** 冒險階段：派遣冒險者執行任務（支付薪資、橫置），進入組隊步驟。 */
   | { readonly type: "dispatch"; readonly task: string; readonly adventurers: readonly string[] }
@@ -173,9 +175,16 @@ export function applyAction(prev: GameState, action: Action, lib: CardLibrary): 
       need("guild", "公會階段");
       if (p.actionsLeft < 1) throw new RuleError("本回合的公會行動已經用完");
       if (p.staging.length >= stagingSlots(p)) throw new RuleError("任務暫存格已滿");
-      const uid = state.board[action.boardIndex];
-      if (!uid) throw new RuleError("公告欄的這個位置沒有任務");
-      state.board[action.boardIndex] = null; // 空位在輪末才補
+      let uid: string | null | undefined;
+      if ("fromDeck" in action) {
+        if (state.config.taskSupply !== "deckTop") throw new RuleError("目前的規則不能從任務牌庫拿取");
+        uid = state.taskDeck.shift();
+        if (!uid) throw new RuleError("任務牌庫已經沒有牌");
+      } else {
+        uid = state.board[action.boardIndex];
+        if (!uid) throw new RuleError("公告欄的這個位置沒有任務");
+        state.board[action.boardIndex] = null; // 空位在輪末才補
+      }
       p.staging.push(uid);
       p.actionsLeft -= 1;
       log(`接取任務「${taskDef(state, lib, uid).name}」`);
@@ -491,6 +500,10 @@ function beginTurn(state: GameState, lib: CardLibrary): void {
   const p = currentPlayer(state);
   p.actionsLeft = RULES.guildActions;
   p.missionsThisTurn = 0;
+  if (state.config.taskSupply === "refill") {
+    // 試驗方案「回合開始補滿」：公告欄的空位從任務牌庫補滿
+    state.board = state.board.map((uid) => uid ?? state.taskDeck.shift() ?? null);
+  }
   onTurnStart(state, lib, p, (text) => state.log.push({ round: state.round, player: p.id, text }));
 }
 

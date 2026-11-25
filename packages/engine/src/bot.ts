@@ -187,6 +187,7 @@ export function botAction(state: GameState, lib: CardLibrary): Action {
           if (score > bestScore) [best, bestScore] = [i, score];
         });
         if (best >= 0) return { type: "acceptTask", boardIndex: best };
+        if (state.config.taskSupply === "deckTop" && state.taskDeck.length) return { type: "acceptTask", fromDeck: true };
       }
       if (p.adventurers.length < 5 && recruitIndex >= 0) return { type: "recruit", tavernIndex: recruitIndex };
       return { type: "endGuildPhase" };
