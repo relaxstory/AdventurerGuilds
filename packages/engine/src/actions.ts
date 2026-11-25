@@ -414,9 +414,10 @@ function startMission(state: GameState, lib: CardLibrary, p: PlayerState, taskUi
 function rollMission(state: GameState, lib: CardLibrary, rng: Rng, p: PlayerState, m: NonNullable<GameState["mission"]>, log: (text: string, dice?: number[]) => void): void {
   const def = taskDef(state, lib, m.task);
   ab.onParticipate(state, lib, p, m, log);
-  m.pool = ab.dicePool(state, lib, m, def);
+  const pool = ab.dicePool(state, lib, m, def);
+  m.pool = Math.max(RULES.minDicePool, pool); // 骰池至少 1 顆
   m.dice = rng.rollDice(m.pool);
-  log(`擲 ${m.pool} 顆骰子`, [...m.dice]);
+  log(pool < m.pool ? `骰池不足 ${RULES.minDicePool} 顆，改擲 ${m.pool} 顆骰子` : `擲 ${m.pool} 顆骰子`, [...m.dice]);
   ab.afterRollMandatory(state, lib, m, def, log);
   m.stage = "adjust";
 }

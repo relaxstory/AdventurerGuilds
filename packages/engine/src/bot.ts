@@ -71,7 +71,7 @@ function chooseParty(state: GameState, lib: CardLibrary, taskUid: string): strin
 
   if (c.op === "atMost") {
     const pick = [...upright].sort((a, b) => dice(a) - dice(b))[0];
-    if (!pick || dice(pick) * 3.5 > c.x + n + 1) return null;
+    if (!pick || Math.max(RULES.minDicePool, dice(pick)) * 3.5 > c.x + n + 1) return null;
     party = [pick];
   } else {
     const target = c.op === "atLeast" ? c.x - n + 1 : (c.x + c.y) / 2 - 1;

@@ -1,10 +1,12 @@
 /** 內部版本號：規則或架構調整時才升版，紀錄見 docs/versions.md。 */
-export const GAME_VERSION = "alpha1.2";
+export const GAME_VERSION = "alpha1.3";
 
 /** 規則數值，出處見 docs/spec.md。 */
 export const RULES = {
   rounds: 8,
   startGold: 5,
+  /** 骰池至少 1 顆（docs/spec.md 7.1 第 4 步）。 */
+  minDicePool: 1,
   startReputation: 0,
   guildActions: 3,
   adventurerCapacity: 5,
