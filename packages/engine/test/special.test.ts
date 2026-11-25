@@ -85,6 +85,36 @@ describe("特殊能力", () => {
     ).toThrow("無法完整執行");
   });
 
+  it("學舌鳥：複製里諾的「對手選擇一項」時，原本和複製的選擇都要做，不會互相覆蓋", () => {
+    let { state, lib } = adventure();
+    const [rino, bird] = hire(state, "STD-C17", "STD-C47");
+    const seat = otherSeat(state);
+    const opp = state.players[seat]!.id;
+    const [a, b] = hireFor(state, seat, "STD-C37", "STD-C46");
+    state = run(state, lib, { type: "activate", card: rino!, skill: "【你好，我可以逮捕你嗎？】", player: opp, copy: { card: bird!, params: { player: opp } } });
+    expect(state.pending).toMatchObject({ kind: "tapOrFlip", source: rino });
+    expect(state.pendingQueue).toMatchObject([{ kind: "tapOrFlip", source: bird }]);
+    state = run(state, lib, { type: "decide", decision: { option: "tap", target: a! } });
+    expect(state.pending).toMatchObject({ kind: "tapOrFlip", source: bird });
+    expect(() => run(state, lib, { type: "decide", decision: { option: "flip" } })).toThrow(); // 學舌鳥無法翻面
+    state = run(state, lib, { type: "decide", decision: { option: "tap", target: b! } });
+    expect(state.pending).toBeNull();
+    expect([state.adventurerCards[a!]!.tapped, state.adventurerCards[b!]!.tapped]).toEqual([true, true]);
+  });
+
+  it("學舌鳥：輪到複製的選擇時，兩個選項都無法執行就略過", () => {
+    let { state, lib } = adventure();
+    const [bruce, bird] = hire(state, "STD-C12", "STD-C47");
+    const seat = otherSeat(state);
+    const other = state.players[seat]!;
+    other.gold = 0;
+    const [a] = hireFor(state, seat, "STD-C37");
+    state = run(state, lib, { type: "activate", card: bruce!, skill: "【布魯斯！】", player: other.id, copy: { card: bird!, params: { player: other.id } } });
+    state = run(state, lib, { type: "decide", decision: { option: "tap", target: a! } });
+    expect(state.pending).toBeNull();
+    expect(state.log.at(-1)!.text).toContain("兩個選項都無法執行");
+  });
+
   it("學舌鳥：複製方葵的能力時可以指定不同的目標", () => {
     const { state, lib } = adventure();
     const [fang, bird] = hire(state, "STD-C16", "STD-C47");

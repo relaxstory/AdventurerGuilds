@@ -277,11 +277,14 @@ export function PendingPanel({ state, lib, act }: { state: GameState; lib: CardL
                 橫置 {ab.faceOf(state, lib, u).name}
               </button>
             ))}
-            {pending.kind === "tapOrPay" ? (
-              <button onClick={() => decide({ option: "pay" })}>支付 {pending.amount} 金</button>
-            ) : (
-              <button onClick={() => decide({ option: "flip" })}>讓 {ab.faceOf(state, lib, pending.source).name} 翻面</button>
-            )}
+            {/* 只顯示可以完整執行的選項（例如學舌鳥複製時，學舌鳥無法翻面） */}
+            {pending.kind === "tapOrPay"
+              ? (state.players.find((x) => x.id === pending.player)?.gold ?? 0) >= pending.amount && (
+                  <button onClick={() => decide({ option: "pay" })}>支付 {pending.amount} 金</button>
+                )
+              : ab.canFlip(state, lib, pending.source) && (
+                  <button onClick={() => decide({ option: "flip" })}>讓 {ab.faceOf(state, lib, pending.source).name} 翻面</button>
+                )}
           </div>
         </>
       );

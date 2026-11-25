@@ -252,10 +252,13 @@ function planEffects(
             log(`${other.name} 兩個選項都無法執行，沒有效果`);
             return;
           }
-          state.pending =
+          // 用排隊的方式加入：學舌鳥複製時，原本的決定和複製的決定都要做（不能互相覆蓋）
+          ab.pushPending(
+            state,
             c.code === "EFF_OPPONENT_TAP_OR_PAY"
               ? { kind: "tapOrPay", player: other.id, from: p.id, amount, source: a.card }
-              : { kind: "tapOrFlip", player: other.id, from: p.id, source: a.card };
+              : { kind: "tapOrFlip", player: other.id, from: p.id, source: a.card },
+          );
         });
         break;
       }
@@ -342,7 +345,7 @@ function planEffects(
         if (!p.adventurers.includes(t!) || t === a.card) throw new RuleError(`${label}：請選擇自己公會中的一名雙面冒險者`);
         if (!ab.canFlip(state, lib, t!)) throw new RuleError(`${label}：${ab.faceOf(state, lib, t!).name} 不是可以翻面的雙面冒險者`);
         plan.push(() => {
-          log(`${label}：暫時翻轉 ${ab.faceOf(state, lib, t!).name}，菲特放在它下方`);
+          log(`${label}：暫時翻轉 ${ab.faceOf(state, lib, t!).name}，${ab.faceOf(state, lib, a.card).name} 放在它下方`);
           ab.flip(state, lib, t!, p.id, log); // 翻面會觸發「當此冒險者被翻面時」（G15）
           state.adventurerCards[t!]!.flipLock = a.card;
           state.adventurerCards[a.card]!.under = t!;
@@ -393,8 +396,20 @@ export function decide(state: GameState, lib: CardLibrary, d: Decision, log: (pl
   const ownUpright = (t: string) => who.adventurers.includes(t) && !state.adventurerCards[t]!.tapped;
   state.pending = null;
   resolveDecision(state, lib, pending, d, who, say, ownUpright, rng);
-  // 下一個排隊中的決定
-  if (!state.pending && state.pendingQueue.length) state.pending = state.pendingQueue.shift()!;
+  // 下一個排隊中的決定；輪到時兩個選項都無法執行的「選擇一項」直接略過
+  while (!state.pending && state.pendingQueue.length) {
+    const next = state.pendingQueue.shift()!;
+    if (next.kind === "tapOrPay" || next.kind === "tapOrFlip") {
+      const target = state.players.find((x) => x.id === next.player)!;
+      const canTap = target.adventurers.some((u) => !state.adventurerCards[u]!.tapped);
+      const canOther = next.kind === "tapOrPay" ? target.gold >= next.amount : ab.canFlip(state, lib, next.source);
+      if (!canTap && !canOther) {
+        log(target.id, `${ab.faceOf(state, lib, next.source).name} 的效果：兩個選項都無法執行，沒有效果`);
+        continue;
+      }
+    }
+    state.pending = next;
+  }
 }
 
 function resolveDecision(
