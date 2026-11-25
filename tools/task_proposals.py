@@ -1,4 +1,4 @@
-"""產生任務數值建議 docs/task-proposals.md 與 data/task-proposals.csv。"""
+"""產生任務數值建議（docs/tasks.md 的「任務數值建議」區段）與 data/task-proposals.csv。"""
 import csv, os
 from collections import defaultdict
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -71,7 +71,7 @@ with open(os.path.join(ROOT,"data","task-proposals.csv"),"w",encoding="utf-8-sig
 
 L=[]; A=L.append
 A("# 任務數值建議 v2\n")
-A("> 由 `tools/task_proposals.py` 產生。依據 `docs/task-difficulty.md` 的難度分級，為試算表中只有名稱與敘述的任務提出條件、標籤與獎勵。")
+A("> 由 `tools/task_proposals.py` 產生。依據本文件「任務難度參考」的難度分級，為試算表中只有名稱與敘述的任務提出條件、標籤與獎勵。")
 A("> 這是建議值，名稱、敘述、委託人沿用試算表；所有數值都可以修改，最後以試玩結果為準。")
 A("> ✅ **已填入試算表**（實裝狀態為「測試」），清除史萊姆改為 4 金、新兵集合改為 3 金，並已逐格比對確認。\n")
 A("## 1. 建議數值\n")
@@ -114,5 +114,8 @@ A("- **條件類型**：需要力氣、人手的任務用「≥ X」；需要安
 A("- **緊急任務**只有 2 個回合，難度降一級或提高獎勵。")
 A("- **永久任務**可以重複完成，所以獎勵偏低。")
 A("- **聲望為負的任務只有 1 張**（下水道裡的交易）。王國榮譽「地下交易」「暗影之主」的黑道路線需要更多這類任務，建議之後補充。")
-with open(os.path.join(ROOT,"docs","task-proposals.md"),"w",encoding="utf-8") as f: f.write("\n".join(L))
+import sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from docsection import write_section
+write_section(os.path.join(ROOT,"docs","tasks.md"), "TASK_PROPOSALS", "二、任務數值建議", "\n".join(L))
 print("\n".join(L))

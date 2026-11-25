@@ -1,7 +1,7 @@
 """技能模板清單的來源資料。
 
 執行後產生：
-- docs/skill-templates.md   技能模板清單
+- docs/abilities.md 的「技能模板清單」區段
 - data/skill-templates.json 給卡片資料管線使用的模板清單
 
 每張卡的子句對照表 data/skill-mapping.csv 由卡片資料管線維護，本腳本只讀取。
@@ -206,6 +206,8 @@ for ty in TYPES:
         if t != ty: continue
         L(f"| `{code}` | {name} | {text} | {params} | {'、'.join(uniq_cards(code))} |")
     L("")
-with open(os.path.join(ROOT, "docs", "skill-templates.md"), "w", encoding="utf-8") as f:
-    f.write("\n".join(lines))
+import sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from docsection import write_section
+write_section(os.path.join(ROOT, "docs", "abilities.md"), "SKILL_TEMPLATES", "一、技能模板清單", "\n".join(lines))
 print(len(T), "templates;", len(M), "clauses;", cards, "cards;", reused, "reused")

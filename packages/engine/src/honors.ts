@@ -3,7 +3,7 @@ import type { CardLibrary, TaskDef } from "./defs.js";
 import type { GameResult, GameState, HonorResult, PlayerState } from "./state.js";
 
 /**
- * 王國榮譽的評選方式（docs/honor-cards.md）。
+ * 王國榮譽的評選方式（docs/cards.md）。
  * 回傳每位玩家的數值，數值最高者取得；數值必須大於 0，同分都拿到。
  * 「最低」類的榮譽（暗影之主）以負號轉成「最高」。
  */
@@ -17,7 +17,7 @@ interface Ctx {
 const completedDefs = (ctx: Ctx, p: PlayerState): TaskDef[] =>
   p.completed.map((uid) => ctx.lib.task(ctx.state.taskCards[uid]!.defKey));
 
-/** 冒險者（不含衍生物，docs/honor-cards.md 通用規則 #3）。 */
+/** 冒險者（不含衍生物，docs/cards.md 通用規則 #3）。 */
 const units = (ctx: Ctx, p: PlayerState) => p.adventurers.filter((uid) => !ctx.state.adventurerCards[uid]!.derivative);
 
 const faces = (ctx: Ctx, p: PlayerState) =>

@@ -31,7 +31,7 @@
 | `npm run web:dev` | 啟動測試模式的開發伺服器 |
 | `npm run web:build` | 打包測試模式為 `packages/web/dist/index.html`（單一檔案，用瀏覽器直接開啟） |
 | `node scripts/artifact.mjs <檔案>` | 把打包結果轉成可以發布為 claude.ai 網頁的內容 |
-| `npm run abilities` | 更新能力實作進度表 `docs/ability-status.md` |
+| `npm run abilities` | 更新能力實作進度表 `docs/abilities.md` |
 | `npm run sim -- 200` | 用 AI 玩家跑 200 局模擬，統計整體數據 |
 | `npm run cards:update` | 從 Google 試算表下載最新內容，產生卡片資料與檢查報告 |
 | `npm run cards:build` | 不下載，只用 `data/raw/` 的快照重新產生 |
@@ -73,7 +73,7 @@
 | 自己的回合 | `useItem`（使用道具）；`activate`（發動主動能力：檢查時機、代價與目標）；`decide`（回應等待中的決定，由被要求的玩家做出） |
 | 公會整理階段 | `choosePenalty`（逾期懲罰需要選擇時）、`sell`（出售道具）、`upgrade`（升級公會）、`endTurn` |
 
-能力的實作進度見 `docs/ability-status.md`（`npm run abilities` 產生）。目前所有實裝與測試中的卡片能力都已實作；史詩任務暫時排除，未實裝的卡片（荊棘玫瑰）不實作。
+能力的實作進度見 `docs/abilities.md`（`npm run abilities` 產生）。目前所有實裝與測試中的卡片能力都已實作；史詩任務暫時排除，未實裝的卡片（荊棘玫瑰）不實作。
 
 ### 實作上的簡化
 

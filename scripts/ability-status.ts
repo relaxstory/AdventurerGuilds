@@ -1,5 +1,5 @@
 /**
- * 產生能力實作進度表 docs/ability-status.md：
+ * 產生能力實作進度表（docs/abilities.md 的「能力實作進度」區段）：
  * 每張卡的技能子句對應的模板是否已在規則引擎中實作。
  * 用法：npm run abilities
  */
@@ -61,5 +61,10 @@ const out = [
   ...lines,
   "",
 ].join("\n");
-writeFileSync("docs/ability-status.md", out);
+// 寫進 docs/abilities.md 的「能力實作進度」區段（標題降一級）
+const demoted = out.split("\n").map((l) => (/^#{1,5} /.test(l) ? "#" + l : l)).join("\n").trim().replace(/^## .*$/m, "## 二、能力實作進度") + "\n";
+const doc = readFileSync("docs/abilities.md", "utf-8");
+const begin = doc.indexOf("\n", doc.indexOf("<!-- BEGIN ABILITY_STATUS")) + 1;
+const end = doc.indexOf("<!-- END ABILITY_STATUS -->");
+writeFileSync("docs/abilities.md", doc.slice(0, begin) + demoted + doc.slice(end));
 console.log(`技能模板 ${tplDone}/${tplTotal}、技能 ${skillsDone}/${skillsTotal}、完整的卡片 ${cardsDone}/${byCard.size}`);
