@@ -1,5 +1,5 @@
 {
-  "latest": 2,
+  "latest": 3,
   "history": [
     {
       "version": 1,
@@ -12,6 +12,12 @@
       "name": "alpha1.1",
       "publishedAt": "2026-11-25T04:43:48.391Z",
       "summary": "修改 1"
+    },
+    {
+      "version": 3,
+      "name": "v3",
+      "publishedAt": "2026-11-25T12:46:14.698Z",
+      "summary": "新增 49、修改 17"
     }
   ]
 }
