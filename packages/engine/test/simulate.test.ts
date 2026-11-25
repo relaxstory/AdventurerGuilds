@@ -40,3 +40,18 @@ describe("模擬整局", () => {
     });
   }
 });
+
+describe("輪末補助", () => {
+  it("金幣少於 3 的玩家在輪末補到 3 金，最後一輪不補", () => {
+    let total = 0;
+    for (let seed = 1; seed <= 10; seed++) {
+      const s = simulate(config({ seed, rounds: 2 }), published);
+      const subsidies = s.log.filter((l) => l.text.startsWith("輪末補助"));
+      expect(subsidies.every((l) => l.round === 1 && l.text.endsWith("→ 3"))).toBe(true);
+      total += subsidies.length;
+      const off = simulate(config({ seed, rounds: 2, goldFloor: 0 }), published);
+      expect(off.log.some((l) => l.text.startsWith("輪末補助"))).toBe(false);
+    }
+    expect(total).toBeGreaterThan(0);
+  });
+});

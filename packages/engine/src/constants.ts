@@ -17,5 +17,7 @@ export const RULES = {
   /** 逾期懲罰 B：聲望往 0 移動的量。 */
   expiryReputation: { 一般: 1, 緊急: 2 } as Record<string, number>,
   upgrade: { freeAtCompleted: 4, discountReputation: 5, discountCost: 3, cost: 7 },
+  /** 輪末補助：金幣少於此數的玩家補到此數（最後一輪不執行）。 */
+  roundEndGoldFloor: 3,
   distrust: { max: 3, goldPenalty: [0, 1, 2, 3] },
 } as const;

@@ -524,7 +524,15 @@ function roundEnd(state: GameState, lib: CardLibrary, rng: Rng): void {
     state.result = scoreGame(state, lib);
     return;
   }
-  // 8. 起始玩家輪替
+  // 8. 輪末補助：金幣少於下限的玩家補到下限
+  const floor = state.config.goldFloor ?? RULES.roundEndGoldFloor;
+  for (const p of state.players) {
+    if (p.gold < floor) {
+      state.log.push({ round: state.round, player: p.id, text: `輪末補助：金幣 ${p.gold} → ${floor}` });
+      p.gold = floor;
+    }
+  }
+  // 9. 起始玩家輪替
   state.round += 1;
   state.startPlayer = (state.startPlayer + 1) % state.players.length;
   state.turnInRound = 0;

@@ -19,6 +19,8 @@ export interface GameConfig {
   /** 測試模式：卡池加入實裝狀態為「測試」的卡片。 */
   readonly includeTest: boolean;
   readonly rounds?: number;
+  /** 輪末補助的金幣下限，預設 RULES.roundEndGoldFloor；0 表示關閉。 */
+  readonly goldFloor?: number;
 }
 
 export interface AdventurerCard {
