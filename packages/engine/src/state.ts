@@ -108,13 +108,14 @@ export interface FormalTask {
 }
 
 /** 二階公會的加成：冒險者格、任務暫存格或道具格 +1。 */
-export type UpgradeBonus = "adventurer" | "staging" | "item" | "task";
+export type UpgradeBonus = "adventurer" | "staging" | "item" | "task" | "economy";
 
 /**
  * 二階公會升級方案（試驗中，docs/versions.md alpha1.2）：
- * choice＝三選一各 +1；adventurer2＝冒險者格改為 +2；specialize＝固定暫存格 +1 再選專精；paid＝三選一，使用額外格子要付 2 金。
+ * choice＝三選一各 +1；adventurer2＝冒險者格改為 +2；specialize＝固定暫存格 +1 再選專精；paid＝三選一，使用額外格子要付 2 金；
+ * guildType＝公會專精：任務型、冒險者型、經濟型（一階公會道具格 2 格）。
  */
-export type UpgradeVariant = "choice" | "adventurer2" | "specialize" | "paid";
+export type UpgradeVariant = "choice" | "adventurer2" | "specialize" | "paid" | "guildType";
 
 /** 升級後的效果，在升級時依方案計算後存下來。 */
 export interface UpgradePerks {
@@ -129,6 +130,8 @@ export interface UpgradePerks {
   readonly extraAttempt?: number;
   /** 出售道具時，額外獲得 N 金。 */
   readonly sellBonus?: number;
+  /** 接取的緊急任務放到時限 [N]（任務型公會）。 */
+  readonly urgentTimer?: number;
   /** 使用額外格子時要付金幣（冒險者格只在第一次使用時付）。 */
   readonly paidExtra?: number;
 }

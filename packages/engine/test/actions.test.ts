@@ -236,6 +236,29 @@ describe("公會整理階段", () => {
     expect([stagingSlots(p), p.upgradePerks?.paidExtra]).toEqual([2, 2]);
   });
 
+  it("公會專精（試驗）：任務型、冒險者型（從棄置區招募）、經濟型；一階公會道具格 2 格", () => {
+    const make = () => {
+      const { state, lib } = setup();
+      (state as { config: unknown }).config = { ...state.config, upgradeVariant: "guildType" };
+      const s = toCleanup(state, lib);
+      currentPlayer(s).completed = ["x1", "x2", "x3", "x4"];
+      return { s, lib };
+    };
+    const a = make();
+    expect(itemSlots(a.s, a.lib, currentPlayer(a.s))).toBe(2);
+    const t = currentPlayer(run(a.s, a.lib, { type: "upgrade", bonus: "task" }));
+    expect([stagingSlots(t), t.upgradePerks?.urgentTimer]).toEqual([2, 2]);
+    const e = run(a.s, a.lib, { type: "upgrade", bonus: "economy" });
+    expect(itemSlots(e, a.lib, currentPlayer(e))).toBe(4);
+    const b = make();
+    const discarded = b.s.adventurerDeck.shift()!;
+    b.s.adventurerDiscard.push(discarded);
+    expect(() => run(b.s, b.lib, { type: "upgrade", bonus: "task", recruit: discarded })).toThrow("冒險者型");
+    const out = run(b.s, b.lib, { type: "upgrade", bonus: "adventurer", recruit: discarded });
+    const p = currentPlayer(out);
+    expect([adventurerCapacity(p), p.adventurers.includes(discarded), out.adventurerDiscard.includes(discarded)]).toEqual([7, true, false]);
+  });
+
   it("升級費用：完成 4 項任務免費；|聲望| ≥ 5 為 3 金；否則 7 金", () => {
     const { state, lib } = setup();
     const s = toCleanup(state, lib);

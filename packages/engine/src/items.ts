@@ -28,7 +28,8 @@ const isUnique = (d: ItemDef) => d.categories.some((c) => bare(c) === "獨特");
 
 /** 道具區的格數：基本 3 格，二階公會選擇道具格時 +1，再加上能力（法的和弦）。 */
 export function itemSlots(state: GameState, lib: CardLibrary, p: PlayerState): number {
-  let n = RULES.itemSlots + (p.upgradePerks?.item ?? 0);
+  const base = (state.config.upgradeVariant ?? RULES.upgradeVariant) === "guildType" ? RULES.guildTypeItemBase : RULES.itemSlots;
+  let n = base + (p.upgradePerks?.item ?? 0);
   for (const u of p.adventurers) for (const c of ab.clauses(state, lib, u, "EXTRA_ITEM_SLOT")) n += ab.amount(state, lib, u, c.x);
   return n;
 }

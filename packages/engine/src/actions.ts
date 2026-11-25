@@ -47,7 +47,8 @@ export type Action =
   /** 公會整理階段：逾期懲罰金幣與聲望都能付時，由玩家選擇。 */
   | { readonly type: "choosePenalty"; readonly task: string; readonly penalty: ExpiryPenalty }
   /** 公會整理階段：升級公會。 */
-  | { readonly type: "upgrade"; readonly bonus: UpgradeBonus }
+  /** recruit：冒險者型公會升級時，從冒險者棄置區招募的冒險者（可省略）。 */
+  | { readonly type: "upgrade"; readonly bonus: UpgradeBonus; readonly recruit?: string }
   /** 公會整理階段：結束回合。 */
   | { readonly type: "endTurn" };
 
@@ -65,6 +66,13 @@ export function adventurerCapacity(p: PlayerState): number {
 /** 依升級方案計算二階公會的效果。 */
 export function upgradePerks(variant: UpgradeVariant, bonus: UpgradeBonus): UpgradePerks {
   const none = { adventurer: 0, staging: 0, item: 0 };
+  if (variant === "guildType") {
+    if (bonus === "task") return { ...none, staging: 1, urgentTimer: 2 };
+    if (bonus === "adventurer") return { ...none, adventurer: 2 };
+    if (bonus === "economy") return { ...none, item: 2 };
+    throw new RuleError("請選擇公會專精：任務型、冒險者型或經濟型");
+  }
+  if (bonus === "economy") throw new RuleError("請選擇升級加成：冒險者格、任務暫存格或道具格");
   if (variant === "specialize") {
     if (bonus === "staging") throw new RuleError("專精請選擇：冒險者、任務或道具（任務暫存格 +1 已固定獲得）");
     const base = { ...none, staging: 1 };
@@ -319,10 +327,20 @@ export function applyAction(prev: GameState, action: Action, lib: CardLibrary): 
       if (p.gold < cost) throw new RuleError(`金幣不足：升級需要 ${cost} 金`);
       p.gold -= cost;
       p.upgraded = true;
+      const variant = state.config.upgradeVariant ?? RULES.upgradeVariant;
+      if (action.recruit !== undefined && !(variant === "guildType" && action.bonus === "adventurer")) throw new RuleError("只有冒險者型公會升級時可以從冒險者棄置區招募");
+      if (action.recruit !== undefined && !state.adventurerDiscard.includes(action.recruit)) throw new RuleError("請從冒險者棄置區選擇冒險者");
       p.upgradeBonus = action.bonus;
       p.upgradePerks = perks;
-      const bonusLabel = { adventurer: "冒險者", staging: "任務暫存格", item: "道具", task: "任務" }[action.bonus];
-      log(`${cost === 0 ? "完成 4 項任務，免費升級為二階公會" : `花費 ${cost} 金升級為二階公會`}（${bonusLabel}）`);
+      const bonusLabel = { adventurer: "冒險者", staging: "任務暫存格", item: "道具", task: "任務", economy: "經濟" }[action.bonus];
+      log(`${cost === 0 ? "完成 4 項任務，免費升級為二階公會" : `花費 ${cost} 金升級為二階公會`}（${variant === "guildType" ? { task: "任務型", adventurer: "冒險者型", economy: "經濟型", staging: "", item: "" }[action.bonus] + "公會" : bonusLabel}）`);
+      if (action.recruit !== undefined) {
+        // 冒險者型公會：從冒險者棄置區招募一名，不消耗公會行動，正常觸發招募能力
+        state.adventurerDiscard = state.adventurerDiscard.filter((u) => u !== action.recruit);
+        p.adventurers.push(action.recruit);
+        log(`從冒險者棄置區招募 ${adventurerFace(state, lib, action.recruit).name}`);
+        ab.onRecruit(state, lib, p, action.recruit, log);
+      }
       break;
     }
 
@@ -519,7 +537,8 @@ function resolveExpiries(state: GameState, lib: CardLibrary, p: PlayerState, log
   for (const uid of p.staging) {
     const def = taskDef(state, lib, uid);
     const timer = def.type in RULES.timer ? (RULES.timer[def.type] ?? null) : 3;
-    p.formal.push({ uid, timer: timer === null ? null : timer + (p.upgradePerks?.timer ?? 0) });
+    const urgent = def.type === "緊急" && p.upgradePerks?.urgentTimer ? p.upgradePerks.urgentTimer : null;
+    p.formal.push({ uid, timer: timer === null ? null : (urgent ?? timer) + (p.upgradePerks?.timer ?? 0) });
   }
   p.staging = [];
   // 4. 出售道具（道具在 M3 實作）；5. 公會升級由玩家以 upgrade 操作執行

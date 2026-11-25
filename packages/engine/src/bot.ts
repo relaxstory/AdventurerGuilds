@@ -3,9 +3,9 @@
  * 策略刻意保持單純，不代表最佳玩法。
  */
 import { RULES } from "./constants.js";
-import { adjustOptions, canBeFired, capacityUsed, clauses, has, dispatchLimitProblem, squadKeyword, unitBaseDice, mustDispatch, outcome, participants, participationProblem, salaryFor } from "./abilities.js";
+import { adjustOptions, canBeFired, capacityUsed, clauses, clausesOf, has, dispatchLimitProblem, squadKeyword, unitBaseDice, mustDispatch, outcome, participants, participationProblem, salaryFor } from "./abilities.js";
 import { activatedSkills, activationImplemented } from "./activate.js";
-import { itemDef, sellPrice } from "./items.js";
+import { itemDef, itemSlots, sellPrice, slottedItems } from "./items.js";
 import { turnOptions } from "./dice.js";
 import { adventurerCapacity, applyAction, stagingSlots, taskDef, upgradeCost, type Action, type ExpiryPenalty } from "./actions.js";
 import { RuleError } from "./errors.js";
@@ -156,10 +156,33 @@ function botActivation(state: GameState, lib: CardLibrary, timing: "start" | "en
 /** AI 每回合最多派遣次數。 */
 export const BOT_MISSION_CAP = 8;
 
+/** 冒險者型公會升級時，AI 從冒險者棄置區挑選的冒險者（價值最高的非衍生物）。 */
+export function botDiscardPick(state: GameState, lib: CardLibrary): string | undefined {
+  return state.adventurerDiscard
+    .filter((u) => state.adventurerCards[u] && !state.adventurerCards[u]!.derivative)
+    .sort((a, b) => value(state, lib, b) - value(state, lib, a))[0];
+}
+
+/** AI 的升級動作（含冒險者型公會的棄置區招募）。 */
+export function botUpgrade(state: GameState, lib: CardLibrary, p: PlayerState, bonus = botUpgradeBonus(state, lib, p)): Action {
+  const pick = (state.config.upgradeVariant ?? RULES.upgradeVariant) === "guildType" && bonus === "adventurer" ? botDiscardPick(state, lib) : undefined;
+  return pick ? { type: "upgrade", bonus, recruit: pick } : { type: "upgrade", bonus };
+}
+
 /** AI 的升級加成選擇：冒險者已滿就加冒險者格，否則加任務暫存格。 */
 export function botUpgradeBonus(state: GameState, lib: CardLibrary, p: PlayerState): UpgradeBonus {
   const full = capacityUsed(state, lib, p) >= adventurerCapacity(p);
-  if ((state.config.upgradeVariant ?? RULES.upgradeVariant) === "specialize") return full ? "adventurer" : "task";
+  const variant = state.config.upgradeVariant ?? RULES.upgradeVariant;
+  if (variant === "specialize") return full ? "adventurer" : "task";
+  if (variant === "guildType") {
+    // 道具相關能力多、或道具區已滿 → 經濟型；冒險者已滿且棄置區有好人選 → 冒險者型；否則任務型
+    const itemSkills = p.adventurers.filter((u) => clausesOf(state, lib, u).some((c) => /ITEM|SELL_PRICE/.test(c.code))).length;
+    if (itemSkills >= 2 || slottedItems(state, lib, p).length >= itemSlots(state, lib, p)) return "economy";
+    const pick = botDiscardPick(state, lib);
+    const weakest = Math.min(...p.adventurers.map((u) => value(state, lib, u)));
+    if (full && pick && value(state, lib, pick) >= weakest) return "adventurer";
+    return "task";
+  }
   return full ? "adventurer" : "staging";
 }
 
@@ -251,7 +274,7 @@ export function botAction(state: GameState, lib: CardLibrary): Action {
         return !def.categories.includes("[狀態]") && lib.clauses(def).length === 0 && sellPrice(state, lib, p, u) > 0;
       });
       if (sellable) return { type: "sell", item: sellable };
-      if (!p.upgraded && upgradeCost(p) <= p.gold - 2) return { type: "upgrade", bonus: botUpgradeBonus(state, lib, p) };
+      if (!p.upgraded && upgradeCost(p) <= p.gold - 2) return botUpgrade(state, lib, p);
       return { type: "endTurn" };
     }
     case "gameOver":

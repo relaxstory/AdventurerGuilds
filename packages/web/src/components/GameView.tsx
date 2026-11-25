@@ -530,7 +530,7 @@ function Adjust({ state, lib, act }: { state: GameState; lib: CardLibrary; act: 
   );
 }
 
-const BONUS_LABEL = { adventurer: "冒險者格 +1", staging: "任務暫存格 +1", item: "道具格 +1", task: "任務專精" } as const;
+const BONUS_LABEL = { adventurer: "冒險者格 +1", staging: "任務暫存格 +1", item: "道具格 +1", task: "任務專精", economy: "經濟型" } as const;
 
 /** 依路線分組（路線順序依卡池順序），同一路線依編號排列。 */
 function byRoute(ids: readonly string[]): [string, string[]][] {
