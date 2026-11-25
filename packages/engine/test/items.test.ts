@@ -230,3 +230,24 @@ describe("兜的和弦", () => {
     expect(currentPlayer(out).items).toEqual([]);
   });
 });
+
+describe("排隊中的道具捨棄", () => {
+  it("輪到時依目前的道具重新判斷：先前的捨棄已經解決超量，就略過", async () => {
+    const { realGame } = await import("./real.js");
+    const { gainItem } = await import("../src/items.js");
+    const { decide } = await import("../src/activate.js");
+    const { currentPlayer } = await import("../src/state.js");
+    const { state, lib } = realGame();
+    const p = currentPlayer(state);
+    const names = [...lib.items.keys()].filter((n) => !lib.item(n).categories.some((c) => c.includes("狀態")) && !lib.item(n).categories.some((c) => c.includes("獨特")));
+    for (const n of names.slice(0, 3)) gainItem(state, lib, p, n, () => {});
+    gainItem(state, lib, p, names[0]!, () => {}); // 第 4 個：超過 3 格，需要捨棄
+    gainItem(state, lib, p, names[1]!, () => {}); // 第 5 個：排隊
+    expect(state.pending?.kind).toBe("discardItem");
+    expect(state.pendingQueue).toHaveLength(1);
+    // 第一次捨棄後仍超量 → 第二次捨棄的清單要是目前的道具
+    decide(state, lib, { option: "discard", target: p.items[0]! }, () => {});
+    expect(state.pending?.kind).toBe("discardItem");
+    expect((state.pending as { items: string[] }).items.every((u) => state.itemCards[u])).toBe(true);
+  });
+});

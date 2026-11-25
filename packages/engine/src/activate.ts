@@ -6,7 +6,7 @@ import { RULES } from "./constants.js";
 import type { CardLibrary, ClauseDef } from "./defs.js";
 import { RuleError } from "./errors.js";
 import type { Rng } from "./rng.js";
-import { consumeCategory, countCategory, discardItem, gainItem, removeItem, splitList } from "./items.js";
+import { consumeCategory, countCategory, discardItem, gainItem, itemSlots, removeItem, slottedItems, splitList } from "./items.js";
 import { createDerivative, destroyAdventurer, destroyItem, finalizeDestroy } from "./lifecycle.js";
 import type { GameState, PlayerState } from "./state.js";
 
@@ -398,7 +398,14 @@ export function decide(state: GameState, lib: CardLibrary, d: Decision, log: (pl
   resolveDecision(state, lib, pending, d, who, say, ownUpright, rng);
   // 下一個排隊中的決定；輪到時兩個選項都無法執行的「選擇一項」直接略過
   while (!state.pending && state.pendingQueue.length) {
-    const next = state.pendingQueue.shift()!;
+    let next = state.pendingQueue.shift()!;
+    if (next.kind === "discardItem") {
+      // 道具區超過上限的捨棄：輪到時依目前的道具重新判斷（先前的捨棄可能已經解決）
+      const owner = state.players.find((x) => x.id === next.player)!;
+      const slotted = slottedItems(state, lib, owner);
+      if (slotted.length <= itemSlots(state, lib, owner)) continue;
+      next = { ...next, items: slotted };
+    }
     if (next.kind === "tapOrPay" || next.kind === "tapOrFlip") {
       const target = state.players.find((x) => x.id === next.player)!;
       const canTap = target.adventurers.some((u) => !state.adventurerCards[u]!.tapped);
