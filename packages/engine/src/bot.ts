@@ -153,6 +153,9 @@ function botActivation(state: GameState, lib: CardLibrary, timing: "start" | "en
   return null;
 }
 
+/** AI 每回合最多派遣次數。 */
+export const BOT_MISSION_CAP = 8;
+
 /** AI 的升級加成選擇：冒險者已滿就加冒險者格，否則加任務暫存格。 */
 export function botUpgradeBonus(state: GameState, lib: CardLibrary, p: PlayerState): UpgradeBonus {
   return capacityUsed(state, lib, p) >= adventurerCapacity(p) ? "adventurer" : "staging";
@@ -217,6 +220,8 @@ export function botAction(state: GameState, lib: CardLibrary): Action {
           return { type: "activate", card: uid, skill: "【小嗶！出動！】", derivative: card.workshop[0]! };
         }
       }
+      // 保護：避免「完成任務後重置＋可重複完成的永久任務」造成無限派遣（設計待辦 #8）
+      if (p.missionsThisTurn >= BOT_MISSION_CAP) return botActivation(state, lib, "end") ?? { type: "endAdventurePhase" };
       const tasks = [
         ...p.formal.filter((f) => f.timer !== null).sort((a, b) => a.timer! - b.timer!).map((f) => f.uid),
         ...p.staging,
