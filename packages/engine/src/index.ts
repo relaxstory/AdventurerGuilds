@@ -19,7 +19,7 @@ export {
   type ExpiryPenalty,
 } from "./actions.js";
 export { scoreGame, HONOR_RULES } from "./honors.js";
-export { botAction, botDiscardPick, botUpgrade, botUpgradeBonus, simulate } from "./bot.js";
+export { BOT_SETTINGS, botAction, botDiscardPick, honorGain, botUpgrade, botUpgradeBonus, simulate } from "./bot.js";
 export {
   adjustOptions,
   outcome,

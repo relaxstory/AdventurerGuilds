@@ -9,6 +9,7 @@ import { itemDef, itemSlots, sellPrice, slottedItems } from "./items.js";
 import { turnOptions } from "./dice.js";
 import { adventurerCapacity, applyAction, stagingSlots, taskDef, upgradeCost, type Action, type ExpiryPenalty } from "./actions.js";
 import { RuleError } from "./errors.js";
+import { HONOR_RULES } from "./honors.js";
 import type { CardLibrary, CardSource } from "./defs.js";
 import { CardLibrary as Library } from "./defs.js";
 import { createGame } from "./setup.js";
@@ -16,11 +17,41 @@ import { currentPlayer, type GameConfig, type GameState, type PlayerState, type 
 
 const value = (state: GameState, lib: CardLibrary, uid: string) => unitBaseDice(state, lib, uid) * 2 - salaryFor(state, lib, [uid]).total;
 
+/** AI 的可調整設定（模擬比較用）。honorWeight：王國競爭模式（榮譽卡公開）時，榮譽對決策的權重，0 表示不看榮譽。 */
+export const BOT_SETTINGS = { honorWeight: 3 };
+
+const honorsVisible = (state: GameState) => BOT_SETTINGS.honorWeight > 0 && state.config.honorMode === "competition" && state.honors.length > 0;
+
+/**
+ * 王國競爭模式：評估一個變化（招募、解僱、完成任務）對自己榮譽排名的幫助。
+ * 領先或接近第一名的榮譽，每一步都有價值；落後很多的榮譽幾乎不追。其他模式回傳 0。
+ */
+export function honorGain(state: GameState, lib: CardLibrary, p: PlayerState, mutate: (q: PlayerState) => void): number {
+  if (!honorsVisible(state)) return 0;
+  const ctx = { state, lib };
+  const copy: PlayerState = { ...p, adventurers: [...p.adventurers], completed: [...p.completed] };
+  mutate(copy);
+  let gain = 0;
+  for (const h of state.honors) {
+    const ev = HONOR_RULES[h];
+    if (!ev) continue;
+    const before = ev(ctx, p);
+    const after = ev(ctx, copy);
+    if (after === before) continue;
+    const best = Math.max(0, ...state.players.filter((x) => x.id !== p.id).map((x) => ev(ctx, x)));
+    const gap = best - before;
+    const weight = gap > 3 ? 0.2 : 1 / (1 + Math.max(0, gap));
+    gain += Math.sign(after - before) * Math.min(Math.abs(after - before), 3) * weight;
+  }
+  return gain;
+}
+
 function bestTavernIndex(state: GameState, lib: CardLibrary): number {
   let best = -1;
   let bestValue = -Infinity;
+  const p = currentPlayer(state);
   state.tavern.forEach((uid, i) => {
-    const v = value(state, lib, uid);
+    const v = value(state, lib, uid) + BOT_SETTINGS.honorWeight * honorGain(state, lib, p, (q) => q.adventurers.push(uid));
     if (v > bestValue) [best, bestValue] = [i, v];
   });
   return best;
@@ -180,6 +211,16 @@ export function botUpgradeBonus(state: GameState, lib: CardLibrary, p: PlayerSta
     if (itemSkills >= 2 || slottedItems(state, lib, p).length >= itemSlots(state, lib, p)) return "economy";
     const pick = botDiscardPick(state, lib);
     const weakest = Math.min(...p.adventurers.map((u) => value(state, lib, u)));
+    if (honorsVisible(state)) {
+      // 榮譽公開：依本局榮譽卡的路線決定專精（人才→冒險者型、任務→任務型、道具能力多→經濟型）
+      const routes = state.honors.map((h) => lib.honor(h).route);
+      const score = {
+        task: routes.filter((r) => r === "任務").length + 1,
+        adventurer: routes.filter((r) => r === "人才").length + (full ? 1 : 0) + (pick ? 0.5 : 0),
+        economy: itemSkills + routes.filter((r) => r === "財富").length * 0.5,
+      };
+      return (Object.entries(score).sort((a, b) => b[1] - a[1])[0]![0]) as UpgradeBonus;
+    }
     if (full && pick && value(state, lib, pick) >= weakest) return "adventurer";
     return "task";
   }
@@ -219,7 +260,12 @@ export function botAction(state: GameState, lib: CardLibrary): Action {
           if (!def.condition) return;
           const need = def.condition.op === "atMost" ? 1 : def.condition.x / 3.5;
           if (need > dice + 1) return;
-          const score = ((def.gold ?? 0) + 2 * Math.abs(def.reputation ?? 0) + 1) / Math.max(1, need);
+          const honor = honorGain(state, lib, p, (q) => {
+            q.completed.push(uid);
+            q.gold += def.gold ?? 0;
+            q.reputation += def.reputation ?? 0;
+          });
+          const score = ((def.gold ?? 0) + 2 * Math.abs(def.reputation ?? 0) + 1) / Math.max(1, need) + BOT_SETTINGS.honorWeight * honor;
           if (score > bestScore) [best, bestScore] = [i, score];
         });
         if (best >= 0) return { type: "acceptTask", boardIndex: best };
@@ -230,11 +276,16 @@ export function botAction(state: GameState, lib: CardLibrary): Action {
       if (recruitIndex >= 0 && used < adventurerCapacity(p) && p.gold >= slotFee + (slotFee ? 2 : 0)) return { type: "recruit", tavernIndex: recruitIndex };
       // 冒險者已滿：酒館有明顯更好的冒險者時，解僱最弱的一名來換
       if (recruitIndex >= 0) {
-        const candidate = value(state, lib, state.tavern[recruitIndex]!);
+        const incoming = state.tavern[recruitIndex]!;
+        // 保留價值：本身價值＋解僱後對榮譽的損失
+        const keep = (u: string) => value(state, lib, u) - BOT_SETTINGS.honorWeight * honorGain(state, lib, p, (q) => (q.adventurers = q.adventurers.filter((x) => x !== u)));
         const weakest = p.adventurers
           .filter((u) => !state.adventurerCards[u]!.derivative && !has(state, lib, u, "NOT_COUNT_CAPACITY") && canBeFired(state, lib, u) && !state.adventurerCards[u]!.squad?.length)
-          .sort((a, b) => value(state, lib, a) - value(state, lib, b))[0];
-        if (weakest && candidate >= value(state, lib, weakest) + 2) return { type: "recruit", tavernIndex: recruitIndex, replace: weakest };
+          .sort((a, b) => keep(a) - keep(b))[0];
+        const candidate = weakest
+          ? value(state, lib, incoming) + BOT_SETTINGS.honorWeight * honorGain(state, lib, p, (q) => (q.adventurers = [...q.adventurers.filter((x) => x !== weakest), incoming]))
+          : 0;
+        if (weakest && candidate >= keep(weakest) + 2) return { type: "recruit", tavernIndex: recruitIndex, replace: weakest };
       }
       return { type: "endGuildPhase" };
     }
