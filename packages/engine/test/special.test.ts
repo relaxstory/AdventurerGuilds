@@ -26,13 +26,17 @@ describe("特殊能力", () => {
     expect(state.adventurerDeck.length).toBe(deck); // 補了一張到酒館，又洗回一張
   });
 
-  it("送錯的軍令：派遣 [迅捷] 冒險者參與時，可以直接完成任務", () => {
+  it("送錯的軍令：派遣 [迅捷] 冒險者參與時，直接完成任務（不擲骰）", () => {
     const { state, lib } = adventure();
-    const [riley] = hire(state, "STD-C13");
+    const [riley, leon] = hire(state, "STD-C13", "STD-C21");
     const t = take(state, "STD-M02");
-    const s = structuredClone(run(state, lib, { type: "dispatch", task: t, adventurers: [riley!] }, { type: "roll" }));
-    s.mission!.dice = [6, 6]; // ≤6 本來會失敗
-    expect(currentPlayer(run(s, lib, { type: "resolve" })).completed).toEqual([t]);
+    const s = run(state, lib, { type: "dispatch", task: t, adventurers: [riley!] });
+    expect(s.mission).toBeNull();
+    expect(currentPlayer(s).completed).toEqual([t]);
+    expect(s.log.some((l) => l.text.includes("直接完成"))).toBe(true);
+    // 沒有 [迅捷] 冒險者時照常擲骰
+    const t2 = take(state, "STD-M02");
+    expect(run(state, lib, { type: "dispatch", task: t2, adventurers: [leon!] }).mission).not.toBeNull();
   });
 
   it("守門員小嗶：對手橫置你的冒險者時改為指定它，原本的目標不受影響，守門員被銷毀", () => {

@@ -213,6 +213,14 @@ export function applyAction(prev: GameState, action: Action, lib: CardLibrary): 
       need("adventure", "冒險階段");
       if (state.mission) throw new RuleError("還有進行中的派遣");
       startMission(state, lib, p, action.task, action.adventurers, log);
+      // 送錯的軍令：派遣 [迅捷] 冒險者時直接完成，不擲骰
+      const m = state.mission!;
+      if (ab.completesDirectly(state, lib, m)) {
+        ab.onParticipate(state, lib, p, m, log);
+        m.stage = "adjust";
+        m.autoSuccess = true;
+        resolveMission(state, lib, p, m, log);
+      }
       break;
     }
 
@@ -368,7 +376,8 @@ function resolveMission(state: GameState, lib: CardLibrary, p: PlayerState, m: N
     p.gold += gold;
     p.reputation += def.reputation ?? 0;
     if (p.distrust > 0) p.distrust -= 1; // 先用目前層數扣報酬，再消除 1 層
-    log(`「${def.name}」結果值 ${result}，目標 ${condText}${adjText}：成功，獲得 ${gold} 金、聲望 ${signed(def.reputation ?? 0)}`, [...m.dice]);
+    const how = m.autoSuccess ? (m.dice.length ? "視為成功" : "直接完成") : `結果值 ${result}，目標 ${condText}${adjText}：成功`;
+    log(`「${def.name}」${how}，獲得 ${gold} 金、聲望 ${signed(def.reputation ?? 0)}`, m.dice.length ? [...m.dice] : undefined);
   } else {
     log(`「${def.name}」結果值 ${result}，目標 ${condText}${adjText}：失敗`, [...m.dice]);
   }

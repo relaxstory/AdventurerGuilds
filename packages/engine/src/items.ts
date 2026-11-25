@@ -157,7 +157,8 @@ export function useItem(state: GameState, lib: CardLibrary, p: PlayerState, a: U
 
   const affectsDice = codes.includes("EFF_BASE_DICE_ROUND");
   const tier = codes.includes("ITEM_TOKEN_TIER_RESULT");
-  if (affectsDice && state.mission?.stage !== "assemble") throw new RuleError(`${label} 只能在派遣的組隊步驟（建立骰池前）使用`);
+  // 派遣 → 建立骰池 → 擲骰 → 結果是連續的動作，影響骰數的道具只能在派遣流程以外的冒險階段使用
+  if (affectsDice && (state.phase !== "adventure" || state.mission)) throw new RuleError(`${label} 只能在冒險階段、派遣流程以外的時候使用`);
   if (tier && state.mission?.stage !== "adjust") throw new RuleError(`${label} 只能在擲骰後使用`);
   if (!affectsDice && !tier && state.mission) throw new RuleError("派遣進行中，不能使用這個道具");
 

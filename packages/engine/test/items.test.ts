@@ -116,13 +116,17 @@ describe("製作與轉換", () => {
 });
 
 describe("使用道具", () => {
-  it("強壯藥劑：只能在組隊步驟使用，本輪基礎骰數 +2", () => {
+  it("強壯藥劑：在冒險階段、派遣流程以外使用，本輪基礎骰數 +2；派遣流程中不能使用", () => {
     const { state, lib } = adventure();
     const [leon] = hire(state, "STD-C21");
     const [potion] = give(state, lib, "伊蓮娜的強壯藥劑");
-    expect(() => run(state, lib, { type: "useItem", item: potion!, targets: [leon!] })).toThrow("組隊步驟");
     const t = take(state, "STD-M04");
-    const s = run(state, lib, { type: "dispatch", task: t, adventurers: [leon!] }, { type: "useItem", item: potion!, targets: [leon!] }, { type: "roll" });
+    const inMission = run(state, lib, { type: "dispatch", task: t, adventurers: [leon!] });
+    expect(() => run(inMission, lib, { type: "useItem", item: potion!, targets: [leon!] })).toThrow("派遣流程以外");
+    const guild = structuredClone(state);
+    guild.phase = "guild";
+    expect(() => run(guild, lib, { type: "useItem", item: potion!, targets: [leon!] })).toThrow("冒險階段");
+    const s = run(state, lib, { type: "useItem", item: potion!, targets: [leon!] }, { type: "dispatch", task: t, adventurers: [leon!] }, { type: "roll" });
     expect(s.mission!.pool).toBe(1 + 2);
   });
 
@@ -132,7 +136,7 @@ describe("使用道具", () => {
     const [foe] = hireFor(state, otherSeat(state), "STD-C23");
     const [shroom] = give(state, lib, "紅斑菌菇");
     const t = take(state, "STD-M04");
-    let s = run(state, lib, { type: "dispatch", task: t, adventurers: [leon!] }, { type: "useItem", item: shroom!, targets: [foe!] });
+    let s = run(state, lib, { type: "useItem", item: shroom!, targets: [foe!] }, { type: "dispatch", task: t, adventurers: [leon!] });
     expect(s.adventurerCards[foe!]!.roundBaseDelta).toEqual({ round: 1, delta: -1 });
     s.adventurerCards[foe!]!.tapped = true;
     s = run(s, lib, { type: "roll" }, { type: "resolve" }, { type: "endAdventurePhase" }, { type: "endTurn" });

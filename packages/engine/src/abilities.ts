@@ -805,15 +805,18 @@ export function outcome(state: GameState, lib: CardLibrary, m: Mission): { faceS
   const result = (faceSum + resultModifier(state, lib, m, def) + m.resultDelta) * m.resultTimes;
   const n = difficulty(state, lib, m, def);
   // 區間條件由玩家分配難度調整到兩端，等同於結果落在 [X−n, Y+n] 內即可
-  // 送錯的軍令：派遣具有特定特質的冒險者參與，可直接完成此任務
-  const traitAuto = lib.clauses(def).some(
-    (t) => t.code === "TASK_AUTO_COMPLETE_TRAIT" && m.dispatched.some((u) => faceOf(state, lib, u).traits.some((x) => bare(x) === bare(t.x))),
-  );
   const success =
     m.autoSuccess ||
-    traitAuto ||
     (c.op === "atLeast" ? result >= c.x - n : c.op === "atMost" ? result <= c.x + n : result >= c.x - n && result <= c.y + n);
   return { faceSum, result, n, success };
+}
+
+/** 送錯的軍令：派遣具有特定特質的冒險者參與時，可直接完成此任務（不擲骰）。 */
+export function completesDirectly(state: GameState, lib: CardLibrary, m: Mission): boolean {
+  const def = lib.task(state.taskCards[m.task]!.defKey);
+  return lib.clauses(def).some(
+    (t) => t.code === "TASK_AUTO_COMPLETE_TRAIT" && m.dispatched.some((u) => faceOf(state, lib, u).traits.some((x) => bare(x) === bare(t.x))),
+  );
 }
 
 /** 預言與加注的結算。 */

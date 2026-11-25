@@ -54,13 +54,25 @@ export function GameView({
   const [inspected, setInspected] = useState<Inspected | null>(null);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && setInspected(null);
+    // 點放大卡片與其他卡片以外的地方時關閉（點其他卡片會換成那一張）
+    const onPointer = (e: PointerEvent) => {
+      const t = e.target as Element | null;
+      if (t && !t.closest(".preview") && !t.closest(".card")) setInspected(null);
+    };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener("pointerdown", onPointer);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("pointerdown", onPointer);
+    };
   }, []);
 
   const blocked = !!state.pending;
+  // 過勞死凱菲：本回合第一個任務必須派遣（付得出薪資時自動加入）
+  const must = state.phase === "adventure" && me.missionsThisTurn === 0 ? ab.mustDispatch(state, lib, me) : [];
   const dispatch = () => {
-    if (task && act({ type: "dispatch", task, adventurers: party })) {
+    const extra = must.filter((u) => !party.includes(u) && me.gold >= ab.salaryFor(state, lib, [...party, u]).total);
+    if (task && act({ type: "dispatch", task, adventurers: [...party, ...extra] })) {
       setParty([]);
     }
   };
@@ -139,6 +151,7 @@ export function GameView({
               party={party}
               setParty={setParty}
               dispatch={dispatch}
+              must={p.id === me.id ? must : []}
               onActivate={(card, skill) => setActivating({ card, skill })}
               onUseItem={setUsingItem}
             />
@@ -193,12 +206,14 @@ function Guild({
   party,
   setParty,
   dispatch,
+  must,
   onActivate,
   onUseItem,
 }: {
   state: GameState;
   lib: CardLibrary;
   p: PlayerState;
+  must: string[];
   active: boolean;
   act: Act;
   blocked: boolean;
@@ -233,6 +248,11 @@ function Guild({
           {phase === "adventure" && !state.mission && (
             <>
               <span className="muted">選一個任務，再選要派遣的冒險者。</span>
+              {must.length > 0 && (
+                <span className="notice">
+                  本回合第一個任務必須派遣 <b>{must.map((u) => ab.faceOf(state, lib, u).name).join("、")}</b>（派遣時自動加入）
+                </span>
+              )}
               <button className="primary" disabled={!task || !party.length} onClick={dispatch}>派遣</button>
               <button onClick={() => act({ type: "endAdventurePhase" })}>結束冒險階段</button>
             </>
@@ -265,7 +285,7 @@ function Guild({
               state={state}
               lib={lib}
               uid={u}
-              selected={picking && chosen}
+              selected={picking && (chosen || must.includes(u))}
               onClick={picking && !state.adventurerCards[u]!.tapped ? () => setParty(chosen ? party.filter((x) => x !== u) : [...party, u]) : undefined}
             >
               {canAct && (phase === "guild" || phase === "adventure") &&
@@ -299,7 +319,19 @@ function Guild({
         <p className="muted">任務完成區：{p.completed.map((t) => taskDef(state, lib, t).name).join("、")}</p>
       )}
       {p.assignedHonors.length > 0 && (
-        <p className="muted">王國指派：{p.assignedHonors.map((h) => honorText.get(h)?.name ?? h).join("、")}</p>
+        <>
+          <h3>王國指派的榮譽</h3>
+          <ul className="assigned">
+            {p.assignedHonors.map((h) => {
+              const t = honorText.get(h);
+              return (
+                <li key={h}>
+                  {t?.name ?? h}（{t?.route}）：<b>{t?.condition}</b>
+                </li>
+              );
+            })}
+          </ul>
+        </>
       )}
     </section>
   );
@@ -308,6 +340,10 @@ function Guild({
 function ItemUse({ state, lib, uid, act, onUseItem }: { state: GameState; lib: CardLibrary; uid: string; act: Act; onUseItem: (item: string) => void }) {
   const codes = it.itemClauses(state, lib, uid).map((c) => c.code);
   if (!codes.includes("ITEM_CONSUME") && !codes.includes("CONSUME_ALL_TIER_GAIN")) return null;
+  // 影響骰數的道具：冒險階段、派遣流程以外；希氏炸藥：擲骰後（在派遣面板中使用）
+  if (codes.includes("EFF_BASE_DICE_ROUND") && (state.phase !== "adventure" || state.mission)) return null;
+  if (codes.includes("ITEM_TOKEN_TIER_RESULT")) return null;
+  if (state.mission) return null;
   const needsTarget = codes.some((c) => c === "EFF_BASE_DICE_ROUND" || c === "EFF_RESET");
   return <button onClick={() => (needsTarget ? onUseItem(uid) : act({ type: "useItem", item: uid }))}>使用</button>;
 }
@@ -356,7 +392,6 @@ function MissionPanel({
   const joiners = me.adventurers.flatMap((u) =>
     [...activatedSkills(state, lib, u)].filter(([, cs]) => cs.some((c) => c.code === "ADD_PARTICIPANT")).map(([s]) => ({ u, s })),
   );
-  const diceItems = me.items.filter((u) => it.itemClauses(state, lib, u).some((c) => c.code === "EFF_BASE_DICE_ROUND" || c.code === "ITEM_TOKEN_TIER_RESULT"));
 
   return (
     <section className="mission">
@@ -387,9 +422,6 @@ function MissionPanel({
               <button key={u + s} disabled={blocked} onClick={() => onActivate(u, s)}>
                 {ab.faceOf(state, lib, u).name}{s}
               </button>
-            ))}
-            {diceItems.map((u) => (
-              <button key={u} disabled={blocked} onClick={() => onUseItem(u)}>使用【{state.itemCards[u]!.name}】</button>
             ))}
             <button className="primary" disabled={blocked} onClick={() => act({ type: "roll", predictions, baseDice })}>擲骰</button>
           </div>
@@ -478,7 +510,14 @@ function Adjust({ state, lib, act }: { state: GameState; lib: CardLibrary; act: 
 }
 
 function Honors({ state }: { state: GameState }) {
-  if (state.config.honorMode === "assignment") return null;
+  if (state.config.honorMode === "assignment") {
+    return (
+      <section>
+        <h2>王國榮譽（王國指派）</h2>
+        <p className="muted">每位玩家的 3 張榮譽卡顯示在各自的公會中，只判定持有者是否為第一名。</p>
+      </section>
+    );
+  }
   const open = state.config.honorMode === "competition" || state.phase === "gameOver";
   return (
     <section>
