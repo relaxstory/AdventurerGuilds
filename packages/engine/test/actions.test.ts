@@ -202,8 +202,9 @@ describe("公會整理階段", () => {
     expect(out.pendingExpiry).toEqual([]);
   });
 
-  it("二階公會：三種加成各 +1 格", () => {
+  it("二階公會（試驗方案 choice）：三種加成各 +1 格", () => {
     const { state, lib } = setup();
+    (state as { config: unknown }).config = { ...state.config, upgradeVariant: "choice" };
     const s = toCleanup(state, lib);
     currentPlayer(s).completed = ["x1", "x2", "x3", "x4"];
     const before = currentPlayer(s);
@@ -263,14 +264,14 @@ describe("公會整理階段", () => {
     const { state, lib } = setup();
     const s = toCleanup(state, lib);
     const p = currentPlayer(s);
-    expect(() => run(s, lib, { type: "upgrade", bonus: "staging" })).toThrow("升級需要 7 金");
+    expect(() => run(s, lib, { type: "upgrade", bonus: "task" })).toThrow("升級需要 7 金");
     p.reputation = -5;
-    expect(currentPlayer(run(s, lib, { type: "upgrade", bonus: "staging" }))).toMatchObject({ gold: 2, upgraded: true, upgradeBonus: "staging" });
+    expect(currentPlayer(run(s, lib, { type: "upgrade", bonus: "task" }))).toMatchObject({ gold: 2, upgraded: true, upgradeBonus: "task" });
     p.reputation = 0;
     p.completed = ["x1", "x2", "x3", "x4"];
-    const out = run(s, lib, { type: "upgrade", bonus: "staging" });
+    const out = run(s, lib, { type: "upgrade", bonus: "task" });
     expect(currentPlayer(out)).toMatchObject({ gold: 5, upgraded: true });
-    expect(() => run(out, lib, { type: "upgrade", bonus: "item" })).toThrow("已經是二階公會");
+    expect(() => run(out, lib, { type: "upgrade", bonus: "economy" })).toThrow("已經是二階公會");
   });
 });
 

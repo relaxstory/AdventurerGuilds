@@ -242,7 +242,7 @@ function Guild({
         <span>💰 {p.gold}</span>
         <span>⭐ 聲望 {p.reputation}</span>
         {p.distrust > 0 && <span className="warn">王國不信任 {p.distrust}</span>}
-        <span>{p.upgraded ? `二階公會（${BONUS_LABEL[p.upgradeBonus ?? "staging"]}）` : "一階公會"}</span>
+        <span>{p.upgraded ? `二階公會（${guildLabel(state, p.upgradeBonus ?? "staging")}）` : "一階公會"}</span>
         <span>完成任務 {p.completed.length}</span>
         <span>冒險者 {ab.capacityUsed(state, lib, p)}/{adventurerCapacity(p)}</span>
         <span>道具 {it.slottedItems(state, lib, p).length}/{slots}</span>
@@ -375,14 +375,35 @@ function Cleanup({ state, lib, p, act }: { state: GameState; lib: CardLibrary; p
       </>
     );
   }
+  const guildType = (state.config.upgradeVariant ?? RULES.upgradeVariant) === "guildType";
+  const discard = state.adventurerDiscard.filter((u) => state.adventurerCards[u] && !state.adventurerCards[u]!.derivative);
+  const [recruit, setRecruit] = useState("");
+  const options = guildType ? (["task", "adventurer", "economy"] as const) : (["adventurer", "staging", "item"] as const);
   return (
     <>
       {!p.upgraded && (
         <span className="upgrade">
           升級為二階公會（{upgradeCost(p) === 0 ? "免費" : `${upgradeCost(p)} 金`}）：
-          {(["adventurer", "staging", "item"] as const).map((bonus) => (
-            <button key={bonus} onClick={() => act({ type: "upgrade", bonus })}>{BONUS_LABEL[bonus]}</button>
+          {options.map((bonus) => (
+            <button
+              key={bonus}
+              title={guildType ? GUILD_TYPE_HINT[bonus as keyof typeof GUILD_TYPE_HINT] : undefined}
+              onClick={() => act(guildType && bonus === "adventurer" && recruit ? { type: "upgrade", bonus, recruit } : { type: "upgrade", bonus })}
+            >
+              {guildLabel(state, bonus)}
+            </button>
           ))}
+          {guildType && (
+            <label>
+              冒險者型：從棄置區招募
+              <select value={recruit} onChange={(e) => setRecruit(e.target.value)}>
+                <option value="">{discard.length ? "不招募" : "（棄置區沒有冒險者）"}</option>
+                {discard.map((u) => (
+                  <option key={u} value={u}>{ab.faceOf(state, lib, u).name}</option>
+                ))}
+              </select>
+            </label>
+          )}
         </span>
       )}
       <button className="primary" onClick={() => act({ type: "endTurn" })}>結束回合</button>
@@ -531,6 +552,17 @@ function Adjust({ state, lib, act }: { state: GameState; lib: CardLibrary; act: 
 }
 
 const BONUS_LABEL = { adventurer: "冒險者格 +1", staging: "任務暫存格 +1", item: "道具格 +1", task: "任務專精", economy: "經濟型" } as const;
+const GUILD_TYPE_LABEL = { task: "任務型", adventurer: "冒險者型", economy: "經濟型", staging: "任務暫存格 +1", item: "道具格 +1" } as const;
+const GUILD_TYPE_HINT = {
+  task: "任務暫存格 +1；接取的緊急任務放在時限 [2]",
+  adventurer: "冒險者格 +2；升級時可以從冒險者棄置區招募 1 名（不消耗公會行動）",
+  economy: "道具格 +2",
+} as const;
+
+/** 二階公會的名稱：公會專精（alpha1.2）顯示公會類型，其他試驗方案顯示加成。 */
+function guildLabel(state: GameState, bonus: keyof typeof BONUS_LABEL): string {
+  return (state.config.upgradeVariant ?? RULES.upgradeVariant) === "guildType" ? GUILD_TYPE_LABEL[bonus] : BONUS_LABEL[bonus];
+}
 
 /** 依路線分組（路線順序依卡池順序），同一路線依編號排列。 */
 function byRoute(ids: readonly string[]): [string, string[]][] {

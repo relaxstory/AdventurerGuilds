@@ -11,7 +11,7 @@ export const RULES = {
   itemSlots: 3,
   stagingSlots: { base: 1 },
   /** 二階公會升級方案（docs/spec.md 8.4）。 */
-  upgradeVariant: "choice" as "choice" | "adventurer2" | "specialize" | "paid" | "guildType",
+  upgradeVariant: "guildType" as "choice" | "adventurer2" | "specialize" | "paid" | "guildType",
   /** guildType 方案：一階公會的道具格。 */
   guildTypeItemBase: 2,
   /** paid 方案：使用額外格子時支付的金幣。 */

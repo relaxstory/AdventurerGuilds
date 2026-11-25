@@ -16,29 +16,29 @@ function adventure(): ReturnType<typeof realGame> {
 }
 
 describe("取得與道具區", () => {
-  it("道具區 3 格，超過時必須捨棄一個（可以捨棄新拿到的）", () => {
+  it("道具區 2 格（一階公會），超過時必須捨棄一個（可以捨棄新拿到的）", () => {
     const { state, lib } = realGame();
-    const [a, b, c] = give(state, lib, "小麥", "牛乳", "獸皮");
+    const [a, b] = give(state, lib, "小麥", "牛乳");
     expect(state.pending).toBeNull();
-    const [d] = give(state, lib, "鹿腿肉");
-    expect(state.pending).toMatchObject({ kind: "discardItem", items: [a, b, c, d] });
-    const out = run(state, lib, { type: "decide", decision: { option: "discard", target: d! } });
-    expect(names(out)).toEqual(["小麥", "牛乳", "獸皮"]);
+    const [c] = give(state, lib, "鹿腿肉");
+    expect(state.pending).toMatchObject({ kind: "discardItem", items: [a, b, c] });
+    const out = run(state, lib, { type: "decide", decision: { option: "discard", target: c! } });
+    expect(names(out)).toEqual(["小麥", "牛乳"]);
   });
 
   it("[狀態] 道具不佔道具格，也不能出售", () => {
     const { state, lib } = realGame();
-    give(state, lib, "小麥", "牛乳", "獸皮", "火爪的信念");
+    give(state, lib, "小麥", "牛乳", "火爪的信念");
     expect(state.pending).toBeNull();
     state.phase = "cleanup";
-    const faith = currentPlayer(state).items[3]!;
+    const faith = currentPlayer(state).items[2]!;
     expect(() => run(state, lib, { type: "sell", item: faith })).toThrow("不能出售");
   });
 
   it("法的和弦：道具格 +1", () => {
     const { state, lib } = realGame();
     hire(state, "STD-C51", "STD-C53", "STD-C48");
-    expect(itemSlots(state, lib, currentPlayer(state))).toBe(4);
+    expect(itemSlots(state, lib, currentPlayer(state))).toBe(3);
   });
 
   it("【獨特】道具整場只有一份：芙蕾雅被招募時獲得父親的家書，第二次拿不到", () => {
@@ -94,9 +94,9 @@ describe("製作與轉換", () => {
   it("漢克【農產加工】：消耗至多 2 個 [農產品]，創造等量的漢克的貨品", () => {
     const { state, lib } = adventure();
     const [hank] = hire(state, "STD-C60");
-    give(state, lib, "小麥", "牛乳", "獸皮");
+    give(state, lib, "小麥", "牛乳");
     const out = run(state, lib, { type: "activate", card: hank!, skill: "【農產加工】", count: 2 });
-    expect(names(out).sort()).toEqual(["漢克的貨品", "漢克的貨品", "獸皮"].sort());
+    expect(names(out).sort()).toEqual(["漢克的貨品", "漢克的貨品"].sort());
   });
 
   it("傑米【看我的傑作！】：創造希氏炸藥並轉移精工指示物；炸藥在擲骰後使用", () => {
@@ -240,9 +240,9 @@ describe("排隊中的道具捨棄", () => {
     const { state, lib } = realGame();
     const p = currentPlayer(state);
     const names = [...lib.items.keys()].filter((n) => !lib.item(n).categories.some((c) => c.includes("狀態")) && !lib.item(n).categories.some((c) => c.includes("獨特")));
-    for (const n of names.slice(0, 3)) gainItem(state, lib, p, n, () => {});
-    gainItem(state, lib, p, names[0]!, () => {}); // 第 4 個：超過 3 格，需要捨棄
-    gainItem(state, lib, p, names[1]!, () => {}); // 第 5 個：排隊
+    for (const n of names.slice(0, 2)) gainItem(state, lib, p, n, () => {});
+    gainItem(state, lib, p, names[0]!, () => {}); // 第 3 個：超過 2 格，需要捨棄
+    gainItem(state, lib, p, names[1]!, () => {}); // 第 4 個：排隊
     expect(state.pending?.kind).toBe("discardItem");
     expect(state.pendingQueue).toHaveLength(1);
     // 第一次捨棄後仍超量 → 第二次捨棄的清單要是目前的道具
