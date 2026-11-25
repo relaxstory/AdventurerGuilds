@@ -108,3 +108,28 @@ describe("賴皮的勇者依招募規則（alpha1.3）", () => {
     expect(currentPlayer(s).adventurers).not.toContain(hero);
   });
 });
+
+describe("永久任務：每名冒險者每回合只能參與同一張一次（alpha1.3）", () => {
+  it("參與過的冒險者被重置後，不能再參與同一張永久任務（不論成功或失敗），但可以去做其他任務；沒參與過的可以", () => {
+    let { state, lib } = game();
+    const [a, b, c] = hire(state, "STD-C21", "STD-C13", "STD-C04");
+    const slime = take(state, "STD-M01"); // 清除史萊姆（永久）
+    const other = take(state, "STD-M04");
+    state = run(state, lib, { type: "dispatch", task: slime, adventurers: [a!, b!] }, { type: "roll" }, { type: "resolve" });
+    state.adventurerCards[a!]!.tapped = false; // 例如被汐重置
+    expect(() => run(state, lib, { type: "dispatch", task: slime, adventurers: [a!] })).toThrow("同一回合不能再參與同一張永久任務");
+    expect(() => run(state, lib, { type: "dispatch", task: slime, adventurers: [a!, c!] })).toThrow("同一回合不能再參與同一張永久任務");
+    expect(run(state, lib, { type: "dispatch", task: slime, adventurers: [c!] }).mission).not.toBeNull();
+    expect(run(state, lib, { type: "dispatch", task: other, adventurers: [a!] }).mission).not.toBeNull();
+  });
+
+  it("用「加入此次任務」加入的冒險者也算參與", () => {
+    let { state, lib } = game();
+    const [a, c, rhys] = hire(state, "STD-C21", "STD-C13", "STD-C57");
+    const slime = take(state, "STD-M01");
+    state = run(state, lib, { type: "dispatch", task: slime, adventurers: [a!] }, { type: "roll" }, { type: "resolve" });
+    state.adventurerCards[a!]!.tapped = false;
+    const s = run(state, lib, { type: "dispatch", task: slime, adventurers: [c!] });
+    expect(() => run(s, lib, { type: "activate", card: rhys!, skill: "【空間傳送】", targets: [a!] })).toThrow("同一回合不能再參與同一張永久任務");
+  });
+});

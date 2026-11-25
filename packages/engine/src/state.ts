@@ -99,6 +99,8 @@ export interface TaskCard {
   attempts: number;
   /** 永久任務的完成指示物。 */
   completions: number;
+  /** 永久任務：本回合已經參與過的冒險者（turn 為「輪:回合」）。 */
+  permanentUsed?: { turn: string; adventurers: string[] };
 }
 
 export interface FormalTask {

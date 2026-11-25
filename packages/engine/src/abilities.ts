@@ -831,6 +831,38 @@ export function outcome(state: GameState, lib: CardLibrary, m: Mission): { faceS
   return { faceSum, result, n, success };
 }
 
+const playerTurnKey = (state: GameState) => `${state.round}:${state.turnInRound}`;
+
+/** 本回合已經參與過這張永久任務的冒險者（含小隊成員）。 */
+export function permanentUsed(state: GameState, taskUid: string): string[] {
+  const used = state.taskCards[taskUid]!.permanentUsed;
+  return used && used.turn === playerTurnKey(state) ? used.adventurers : [];
+}
+
+/**
+ * 同一回合中，每名冒險者只能參與同一張永久任務一次，不論成功或失敗（docs/spec.md 10.2）。
+ * 派遣與「加入此次任務」都算參與；新兵小隊的隊員也都算。
+ */
+export function permanentRepeatProblem(state: GameState, lib: CardLibrary, taskUid: string, units: readonly string[]): string | null {
+  const def = lib.task(state.taskCards[taskUid]!.defKey);
+  if (def.type !== "永久") return null;
+  const used = permanentUsed(state, taskUid);
+  for (const u of units) {
+    for (const m of members(state, u)) {
+      if (used.includes(m)) return `${faceOf(state, lib, m).name} 這回合已經參與過「${def.name}」，同一回合不能再參與同一張永久任務`;
+    }
+  }
+  return null;
+}
+
+/** 永久任務結算時，記錄本回合參與過的冒險者。 */
+export function recordPermanentParticipation(state: GameState, lib: CardLibrary, m: Mission): void {
+  const card = state.taskCards[m.task]!;
+  if (lib.task(card.defKey).type !== "永久") return;
+  const all = participants(m).flatMap((u) => members(state, u));
+  card.permanentUsed = { turn: playerTurnKey(state), adventurers: [...new Set([...permanentUsed(state, m.task), ...all])] };
+}
+
 /** 派遣的冒險者（含小隊成員）是否有某個特質。 */
 const partyHasTrait = (state: GameState, lib: CardLibrary, party: readonly string[], trait: string) =>
   party.some((u) => members(state, u).some((m) => faceOf(state, lib, m).traits.some((x) => bare(x) === bare(trait))));

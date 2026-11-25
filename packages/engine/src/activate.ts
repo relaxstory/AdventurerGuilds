@@ -375,7 +375,7 @@ function planEffects(
           if (!upright(state, t)) throw new RuleError(`${label}：${ab.faceOf(state, lib, t).name} 不是直立狀態`);
           if (ab.participants(m).includes(t)) throw new RuleError(`${label}：${ab.faceOf(state, lib, t).name} 已經在這次任務中`);
         }
-        const problem = ab.participationProblem(state, lib, [...ab.participants(m), ...targets]);
+        const problem = ab.participationProblem(state, lib, [...ab.participants(m), ...targets]) ?? ab.permanentRepeatProblem(state, lib, m.task, targets);
         if (problem) throw new RuleError(problem);
         plan.push(() => {
           m.joined.push(...targets);

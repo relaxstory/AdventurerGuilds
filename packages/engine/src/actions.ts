@@ -386,7 +386,7 @@ function startMission(state: GameState, lib: CardLibrary, p: PlayerState, taskUi
     if (!p.adventurers.includes(uid)) throw new RuleError("只能派遣自己公會中的冒險者");
     if (state.adventurerCards[uid]!.tapped) throw new RuleError(`${adventurerFace(state, lib, uid).name} 已經橫置，不能派遣`);
   }
-  const problem = ab.participationProblem(state, lib, party) ?? ab.dispatchLimitProblem(state, lib, party) ?? ab.taskRequirementProblem(state, lib, taskUid, party);
+  const problem = ab.participationProblem(state, lib, party) ?? ab.dispatchLimitProblem(state, lib, party) ?? ab.taskRequirementProblem(state, lib, taskUid, party) ?? ab.permanentRepeatProblem(state, lib, taskUid, party);
   if (problem) throw new RuleError(problem);
 
   const { total: salary } = ab.salaryFor(state, lib, party);
@@ -429,6 +429,7 @@ function resolveMission(state: GameState, lib: CardLibrary, p: PlayerState, m: N
   const pending = ab.pendingMandatory(state, lib, m);
   if (pending) throw new RuleError(pending);
   const taskUid = m.task;
+  ab.recordPermanentParticipation(state, lib, m); // 不論成功或失敗都算參與
   const def = taskDef(state, lib, taskUid);
   const c = def.condition!;
   const card = state.taskCards[taskUid]!;

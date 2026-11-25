@@ -3,7 +3,7 @@
  * 策略刻意保持單純，不代表最佳玩法。
  */
 import { RULES } from "./constants.js";
-import { adjustOptions, canBeFired, capacityUsed, clauses, clausesOf, has, dispatchLimitProblem, squadKeyword, unitBaseDice, mustDispatch, outcome, participants, participationProblem, salaryFor } from "./abilities.js";
+import { adjustOptions, canBeFired, capacityUsed, clauses, clausesOf, has, members, permanentUsed, dispatchLimitProblem, squadKeyword, unitBaseDice, mustDispatch, outcome, participants, participationProblem, salaryFor } from "./abilities.js";
 import { activatedSkills, activationImplemented } from "./activate.js";
 import { itemDef, itemSlots, sellPrice, usedItemSlots } from "./items.js";
 import { turnOptions } from "./dice.js";
@@ -64,7 +64,9 @@ function chooseParty(state: GameState, lib: CardLibrary, taskUid: string): strin
   const c = def.condition;
   if (!c) return null;
   const n = state.taskCards[taskUid]!.attempts;
-  const upright = p.adventurers.filter((uid) => !state.adventurerCards[uid]!.tapped);
+  // 同一回合已經參與過這張永久任務的冒險者不能再參與
+  const used = permanentUsed(state, taskUid);
+  const upright = p.adventurers.filter((uid) => !state.adventurerCards[uid]!.tapped && !members(state, uid).some((m) => used.includes(m)));
   const dice = (uid: string) => unitBaseDice(state, lib, uid);
   const sum = (party: string[]) => party.reduce((s, uid) => s + dice(uid), 0);
   let party: string[] = [];
@@ -188,8 +190,8 @@ function botActivation(state: GameState, lib: CardLibrary, timing: "start" | "en
   return null;
 }
 
-/** AI 每回合最多派遣次數。 */
-export const BOT_MISSION_CAP = 8;
+/** AI 每回合最多派遣次數（安全上限；規則本身已經由永久任務的參與限制避免無限循環）。 */
+export const BOT_MISSION_CAP = 20;
 
 /** 冒險者型公會升級時，AI 從冒險者棄置區挑選的冒險者（價值最高的非衍生物）。 */
 export function botDiscardPick(state: GameState, lib: CardLibrary): string | undefined {
@@ -304,7 +306,7 @@ export function botAction(state: GameState, lib: CardLibrary): Action {
           return { type: "activate", card: uid, skill: "【小嗶！出動！】", derivative: card.workshop[0]! };
         }
       }
-      // 保護：避免「完成任務後重置＋可重複完成的永久任務」造成無限派遣（設計待辦 #8）
+      // 安全上限：避免未知的卡片組合讓模擬卡住
       if (p.missionsThisTurn >= BOT_MISSION_CAP) return botActivation(state, lib, "end") ?? { type: "endAdventurePhase" };
       const tasks = [
         ...p.formal.filter((f) => f.timer !== null).sort((a, b) => a.timer! - b.timer!).map((f) => f.uid),
