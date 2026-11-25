@@ -66,7 +66,7 @@ function chooseParty(state: GameState, lib: CardLibrary, taskUid: string): strin
   const n = state.taskCards[taskUid]!.attempts;
   // 同一回合已經參與過這張永久任務的冒險者不能再參與
   const used = permanentUsed(state, taskUid);
-  const upright = p.adventurers.filter((uid) => !state.adventurerCards[uid]!.tapped && !members(state, uid).some((m) => used.includes(m)));
+  const upright = p.adventurers.filter((uid) => !state.adventurerCards[uid]!.tapped && !members(state, uid).some((m) => used.includes(m) && !has(state, lib, m, "REPEAT_PERMANENT_TASK")));
   const dice = (uid: string) => unitBaseDice(state, lib, uid);
   const sum = (party: string[]) => party.reduce((s, uid) => s + dice(uid), 0);
   let party: string[] = [];

@@ -16,7 +16,7 @@ import type { GameState, Mission, Pending, PlayerState } from "./state.js";
 /** 已實作的技能模板。其餘模板在對應的開發批次完成（docs/development.md）。 */
 export const IMPLEMENTED = new Set([
   "COND_HAS_CARDS",
-  "NO_ROUND_RESET", "NO_TAP_FIRST_DISPATCH", "NO_TAP_DISPATCH", "DISPATCH_ADD_TOKEN_NO_TAP",
+  "NO_ROUND_RESET", "NO_TAP_FIRST_DISPATCH", "NO_TAP_DISPATCH", "DISPATCH_ADD_TOKEN_NO_TAP", "REPEAT_PERMANENT_TASK",
   "DICE_PER_TOKEN", "TOKEN_THRESHOLD_FLIP", "DISPATCH_LIMIT_PER_TURN", "CANNOT_BE_FIRED", "NOT_COUNT_CAPACITY",
   "CANNOT_PARTICIPATE_WITH", "COUNTS_AS_RACE", "ANY_PROFESSION", "FREE_RECRUIT_IF_NAME", "MUST_PARTICIPATE_FIRST",
   "TASK_DIFFICULTY", "WITH_CARD_DIFFICULTY", "WITH_PROFESSION_DICE", "WITH_CARD_DICE", "TASK_BASE_DICE",
@@ -233,10 +233,11 @@ export function onRecruit(state: GameState, lib: CardLibrary, p: PlayerState, ui
 // ── 派遣 ──
 
 /** 派遣時是否橫置；回傳 false 表示不需橫置（並處理放置指示物）。 */
-export function tapOnDispatch(state: GameState, lib: CardLibrary, uid: string, log: Log): boolean {
+export function tapOnDispatch(state: GameState, lib: CardLibrary, uid: string, log: Log, taskType?: string): boolean {
   const card = state.adventurerCards[uid]!;
   const name = faceOf(state, lib, uid).name;
-  const token = clauses(state, lib, uid, "DISPATCH_ADD_TOKEN_NO_TAP")[0];
+  // 凱菲【來點咖啡就好……】：Z 為任務類型限制（例如只限永久任務）
+  const token = clauses(state, lib, uid, "DISPATCH_ADD_TOKEN_NO_TAP").find((c) => !c.z || c.z === taskType);
   if (token) {
     addTokens(state, lib, uid, token.y, amount(state, lib, uid, token.x), log);
     return false;
@@ -849,7 +850,7 @@ export function permanentRepeatProblem(state: GameState, lib: CardLibrary, taskU
   const used = permanentUsed(state, taskUid);
   for (const u of units) {
     for (const m of members(state, u)) {
-      if (used.includes(m)) return `${faceOf(state, lib, m).name} 這回合已經參與過「${def.name}」，同一回合不能再參與同一張永久任務`;
+      if (used.includes(m) && !has(state, lib, m, "REPEAT_PERMANENT_TASK")) return `${faceOf(state, lib, m).name} 這回合已經參與過「${def.name}」，同一回合不能再參與同一張永久任務`;
     }
   }
   return null;

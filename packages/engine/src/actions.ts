@@ -401,7 +401,7 @@ function startMission(state: GameState, lib: CardLibrary, p: PlayerState, taskUi
   // 擲骰前支付薪資
   if (p.gold < salary) throw new RuleError(`金幣不足：薪資需要 ${salary} 金，目前只有 ${p.gold} 金`);
   p.gold -= salary;
-  for (const uid of party) if (ab.tapOnDispatch(state, lib, uid, log)) state.adventurerCards[uid]!.tapped = true;
+  for (const uid of party) if (ab.tapOnDispatch(state, lib, uid, log, def.type)) state.adventurerCards[uid]!.tapped = true;
   ab.recordDispatch(state, party);
   p.missionsThisTurn += 1;
   const names = party.map((uid) => adventurerFace(state, lib, uid).name).join("、");

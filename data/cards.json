@@ -1,5 +1,5 @@
 {
-  "builtAt": "2026-11-25T04:43:48.401Z",
+  "builtAt": "2026-11-25T12:01:21.685Z",
   "cards": {
     "adventurers": [
       {
@@ -4202,18 +4202,30 @@
       "cardId": "STD-C55",
       "cardName": "凱菲",
       "order": "1",
-      "skillName": "【來點咖啡就好……】",
+      "skillName": "【又是一樣的工作……】",
       "clause": "1",
-      "code": "DISPATCH_ADD_TOKEN_NO_TAP",
-      "x": "1",
-      "y": "疲勞",
+      "code": "REPEAT_PERMANENT_TASK",
+      "x": "",
+      "y": "",
       "z": "",
       "note": ""
     },
     {
       "cardId": "STD-C55",
       "cardName": "凱菲",
-      "order": "1",
+      "order": "2",
+      "skillName": "【來點咖啡就好……】",
+      "clause": "1",
+      "code": "DISPATCH_ADD_TOKEN_NO_TAP",
+      "x": "1",
+      "y": "疲勞",
+      "z": "永久",
+      "note": ""
+    },
+    {
+      "cardId": "STD-C55",
+      "cardName": "凱菲",
+      "order": "2",
       "skillName": "【來點咖啡就好……】",
       "clause": "2",
       "code": "DICE_PER_TOKEN",
@@ -4225,7 +4237,7 @@
     {
       "cardId": "STD-C55",
       "cardName": "凱菲",
-      "order": "2",
+      "order": "3",
       "skillName": "【我先睡一下……】",
       "clause": "1",
       "code": "TIMING",
@@ -4237,7 +4249,7 @@
     {
       "cardId": "STD-C55",
       "cardName": "凱菲",
-      "order": "2",
+      "order": "3",
       "skillName": "【我先睡一下……】",
       "clause": "2",
       "code": "COST",
@@ -4249,7 +4261,7 @@
     {
       "cardId": "STD-C55",
       "cardName": "凱菲",
-      "order": "2",
+      "order": "3",
       "skillName": "【我先睡一下……】",
       "clause": "3",
       "code": "EFF_REMOVE_TOKENS_SELF",
@@ -4261,7 +4273,7 @@
     {
       "cardId": "STD-C55",
       "cardName": "凱菲",
-      "order": "3",
+      "order": "4",
       "skillName": "【……撐不住了】",
       "clause": "1",
       "code": "TOKEN_THRESHOLD_FLIP",

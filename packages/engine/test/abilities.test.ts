@@ -90,14 +90,22 @@ describe("派遣與橫置", () => {
     expect(() => run(state, lib, { type: "dispatch", task: t, adventurers: [fang!] })).not.toThrow();
   });
 
-  it("凱菲：派遣時不橫置而是放疲勞指示物，每個疲勞骰數 +1，達到 5 個翻面為過勞死凱菲", () => {
-    let { state, lib } = realGame();
+  it("凱菲：參與一般任務時正常橫置、不放疲勞指示物", () => {
+    const { state, lib } = realGame();
     const [kafi] = hire(state, "STD-C55");
     state.phase = "adventure";
+    const out = run(state, lib, { type: "dispatch", task: take(state, "STD-M04"), adventurers: [kafi!] });
+    expect(out.adventurerCards[kafi!]!.tapped).toBe(true);
+    expect(out.adventurerCards[kafi!]!.tokens["疲勞"]).toBeUndefined();
+  });
+
+  it("凱菲：參與永久任務時不橫置而是放疲勞指示物，可以重複參與同一張永久任務；每個疲勞骰數 +1，達到 5 個翻面為過勞死凱菲", () => {
+    let { state, lib } = realGame();
+    const [kafi] = hire(state, "STD-C55");
+    const t = take(state, "STD-M01");
+    state.phase = "adventure";
     currentPlayer(state).gold = 100;
-    // 同一回合每名冒險者只能參與同一張永久任務一次（alpha1.3），所以每次派遣不同的任務
     for (let i = 1; i <= 4; i++) {
-      const t = take(state, "STD-M04");
       state = run(state, lib, { type: "dispatch", task: t, adventurers: [kafi!] });
       expect(state.adventurerCards[kafi!]!.tapped).toBe(false);
       expect(state.adventurerCards[kafi!]!.tokens["疲勞"]).toBe(i);
@@ -106,7 +114,7 @@ describe("派遣與橫置", () => {
       expect(state.mission!.pool).toBe(1 + i);
       state = run(state, lib, { type: "resolve" });
     }
-    state = run(state, lib, { type: "dispatch", task: take(state, "STD-M04"), adventurers: [kafi!] });
+    state = run(state, lib, { type: "dispatch", task: t, adventurers: [kafi!] });
     const card = state.adventurerCards[kafi!]!;
     expect(card.face).toBe("back");
     expect(card.tapped).toBe(true);
