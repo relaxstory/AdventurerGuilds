@@ -169,7 +169,10 @@ export function botAction(state: GameState, lib: CardLibrary): Action {
         const target = kw && p.adventurers.find((u) => squadKeyword(state, lib, u) === kw);
         if (target) return { type: "recruit", tavernIndex: i, squad: { target, position: "bottom" } };
       }
-      if (p.adventurers.length < 3 && recruitIndex >= 0) return { type: "recruit", tavernIndex: recruitIndex };
+      // 開局策略：先招募 2 名，再接任務，剩下的行動繼續招募（保留接任務的行動）
+      if (p.adventurers.length < 2 && recruitIndex >= 0 && (p.staging.length >= stagingSlots(p) || p.actionsLeft > 1)) {
+        return { type: "recruit", tavernIndex: recruitIndex };
+      }
       if (p.staging.length < stagingSlots(p)) {
         const dice = p.adventurers.reduce((s, uid) => s + unitBaseDice(state, lib, uid), 0);
         let best = -1;
