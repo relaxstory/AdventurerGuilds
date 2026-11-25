@@ -155,7 +155,8 @@ export function afterSettle(state: GameState, lib: CardLibrary, p: PlayerState, 
     if (!state.adventurerCards[uid] || !ab.has(state, lib, uid, "AFTER_MISSION_DESTROY_PARTICIPANT")) continue;
     const owner = ab.ownerOf(state, uid);
     const candidates = party.filter((u) => u !== uid && state.adventurerCards[u] && owner?.adventurers.includes(u));
-    if (owner && candidates.length) ab.pushPending(state, { kind: "destroyOwn", player: owner.id, source: uid, candidates });
+    const count = Math.min(candidates.length, ...ab.clauses(state, lib, uid, "AFTER_MISSION_DESTROY_PARTICIPANT").map((c) => ab.amount(state, lib, uid, c.x || "1")));
+    for (let i = 0; owner && i < count; i++) ab.pushPending(state, { kind: "destroyOwn", player: owner.id, source: uid, candidates });
   }
   // 彌的粉絲【已滿足♡♡♡！】：和彌一同參與的任務結算後銷毀
   for (const uid of party) {
