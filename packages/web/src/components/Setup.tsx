@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { GAME_VERSION, type GameConfig, type HonorDraw, type HonorMode } from "../../../engine/src/index.js";
 import { builtAt } from "../data.js";
+import { Codex } from "./Codex.js";
 import { Rules } from "./Rules.js";
 
 export function Setup({ onStart, error }: { onStart: (c: GameConfig) => void; error: string | null }) {
@@ -10,14 +11,19 @@ export function Setup({ onStart, error }: { onStart: (c: GameConfig) => void; er
   const [includeTest, setIncludeTest] = useState(true);
   const [seed, setSeed] = useState(() => String(Math.floor(Math.random() * 1_000_000)));
   const [showRules, setShowRules] = useState(false);
+  const [showCodex, setShowCodex] = useState(false);
 
   return (
     <div className="setup">
       <div className="setup-head">
         <h1>冒險者公會　測試模式 <small className="muted">{GAME_VERSION}</small></h1>
-        <button onClick={() => setShowRules(true)}>簡易規則</button>
+        <span className="row">
+          <button onClick={() => setShowCodex(true)}>冒險者圖鑑</button>
+          <button onClick={() => setShowRules(true)}>簡易規則</button>
+        </span>
       </div>
       {showRules && <Rules onClose={() => setShowRules(false)} />}
+      {showCodex && <Codex onClose={() => setShowCodex(false)} />}
       <p className="muted">一個人在同一個畫面操作 4 個公會，用來試玩規則與卡片。卡片資料版本：{builtAt.slice(0, 16).replace("T", " ")}</p>
       <section>
         <h2>玩家</h2>

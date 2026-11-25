@@ -231,3 +231,26 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 .result { margin: 12px max(16px, env(safe-area-inset-right, 0px)) 12px max(16px, env(safe-area-inset-left, 0px)); background: var(--panel); border: 2px solid var(--accent); border-radius: 10px; padding: 12px; overflow-x: auto; }
 .result table { border-collapse: collapse; width: 100%; }
 .result th, .result td { border-bottom: 1px solid var(--line); padding: 4px 8px; text-align: left; }
+
+/* 冒險者圖鑑 */
+.dialog.codex { width: min(1100px, 100%); height: min(90vh, 900px); display: flex; flex-direction: column; gap: 8px; overflow: hidden; }
+.codex-head { display: flex; justify-content: space-between; align-items: center; }
+.codex-head h2 { margin: 0; }
+.codex-filters { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.codex-filters input[type="search"] { flex: 1 1 180px; min-width: 0; }
+.segmented { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.segmented button { border: 0; border-radius: 0; background: transparent; }
+.segmented button.on { background: var(--accent); color: var(--accent-ink); }
+.codex-grid { flex: 1; overflow: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(210px, 100%), 1fr)); gap: 10px; align-content: start; padding: 2px; }
+.codex-thumb { all: unset; display: block; cursor: pointer; border-radius: 10px; }
+.codex-thumb:focus-visible { outline: 3px solid var(--accent); }
+.codex-thumb .card { width: auto; height: 100%; }
+.codex-thumb .card-body { max-height: 140px; overflow: hidden; -webkit-mask-image: linear-gradient(to bottom, #000 70%, transparent); mask-image: linear-gradient(to bottom, #000 70%, transparent); }
+.carousel { flex: 1; display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+.carousel-nav { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.carousel-track { flex: 1; display: flex; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; overscroll-behavior-x: contain; scrollbar-width: none; }
+.carousel-track::-webkit-scrollbar { display: none; }
+.carousel-slide { flex: 0 0 100%; scroll-snap-align: center; overflow-y: auto; display: flex; justify-content: center; padding: 2px; }
+.carousel-slide .card.large { width: min(520px, 100%); height: max-content; }
+.codex-back { margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--line); display: flex; flex-direction: column; gap: 4px; }
+@media (prefers-reduced-motion: reduce) { .carousel-track { scroll-behavior: auto; } }

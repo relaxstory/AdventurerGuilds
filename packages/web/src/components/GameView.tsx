@@ -21,6 +21,7 @@ import {
 import { honorText } from "../data.js";
 import { useEffect } from "react";
 import { AdventurerCard, CardPreview, InspectContext, ItemCard, TaskCard, type Inspected } from "./Cards.js";
+import { Codex } from "./Codex.js";
 import { ActivateDialog, PendingPanel, UseItemDialog } from "./Dialogs.js";
 import { Rules } from "./Rules.js";
 
@@ -52,6 +53,7 @@ export function GameView({
   const [party, setParty] = useState<string[]>([]);
   const [confirmQuit, setConfirmQuit] = useState(false);
   const [showRules, setShowRules] = useState(false);
+  const [showCodex, setShowCodex] = useState(false);
   const [inspected, setInspected] = useState<Inspected | null>(null);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && setInspected(null);
@@ -87,6 +89,7 @@ export function GameView({
           {state.phase === "guild" && `（公會行動剩 ${me.actionsLeft}）`}
         </div>
         <div className="row">
+          <button onClick={() => setShowCodex(true)}>圖鑑</button>
           <button onClick={() => setShowRules(true)}>規則</button>
           <button onClick={undo} disabled={!canUndo} title="只能反悔沒有揭露新資訊的操作">反悔</button>
           {confirmQuit ? (
@@ -167,6 +170,7 @@ export function GameView({
       </div>
 
       {showRules && <Rules onClose={() => setShowRules(false)} />}
+      {showCodex && <Codex onClose={() => setShowCodex(false)} />}
       {activating && <ActivateDialog state={state} lib={lib} card={activating.card} skill={activating.skill} act={act} onClose={() => setActivating(null)} />}
       {usingItem && state.itemCards[usingItem] && <UseItemDialog state={state} lib={lib} item={usingItem} act={act} onClose={() => setUsingItem(null)} />}
       {inspected && <CardPreview state={state} lib={lib} card={inspected} onClose={() => setInspected(null)} />}
