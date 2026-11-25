@@ -1,6 +1,18 @@
-import type { ReactNode } from "react";
+import { createContext, useContext, type ReactNode } from "react";
 import { abilities as ab, type CardLibrary, type GameState } from "../../../engine/src/index.js";
 import { adventurerText, itemText, taskText } from "../data.js";
+
+/** 點選卡片時放大顯示：kind 為卡片種類，uid 為卡片。 */
+export type Inspected = { readonly kind: "adventurer" | "task" | "item"; readonly uid: string };
+export const InspectContext = createContext<((c: Inspected) => void) | null>(null);
+
+function useClick(kind: Inspected["kind"], uid: string, onClick?: () => void) {
+  const inspect = useContext(InspectContext);
+  return () => {
+    inspect?.({ kind, uid });
+    onClick?.();
+  };
+}
 
 /** 卡片文字：【技能名】粗體，[標籤] 以標籤樣式顯示，保留換行。 */
 export function RichText({ text }: { text: string }) {
@@ -35,6 +47,7 @@ export function AdventurerCard({
   selected,
   onClick,
   children,
+  large,
 }: {
   state: GameState;
   lib: CardLibrary;
@@ -42,7 +55,9 @@ export function AdventurerCard({
   selected?: boolean;
   onClick?: () => void;
   children?: ReactNode;
+  large?: boolean;
 }) {
+  const click = useClick("adventurer", uid, onClick);
   const card = state.adventurerCards[uid]!;
   const face = ab.faceOf(state, lib, uid);
   const raw = adventurerText.get(face.id);
@@ -51,9 +66,8 @@ export function AdventurerCard({
   const salary = ab.unitSalary(state, lib, uid);
   return (
     <div
-      className={`card adventurer${card.tapped ? " tapped" : ""}${selected ? " selected" : ""}${card.derivative ? " derivative" : ""}`}
-      onClick={onClick}
-      title={raw?.story || undefined}
+      className={`card adventurer${card.tapped ? " tapped" : ""}${selected ? " selected" : ""}${card.derivative ? " derivative" : ""}${large ? " large" : ""}`}
+      onClick={large ? undefined : click}
     >
       <div className="card-head">
         <span className="card-name">{face.name}</span>
@@ -81,6 +95,8 @@ export function AdventurerCard({
           </div>
         ))}
         {raw?.flavor && <div className="flavor">{raw.flavor}</div>}
+        {large && raw?.englishName && <div className="muted">{raw.englishName}</div>}
+        {large && raw?.story && <div className="story">{raw.story}</div>}
       </div>
       <Tokens tokens={card.tokens} />
       {card.workshop && card.workshop.length > 0 && <div className="squad">工作室：{card.workshop.join("、")}</div>}
@@ -97,6 +113,7 @@ export function TaskCard({
   selected,
   onClick,
   children,
+  large,
 }: {
   state: GameState;
   lib: CardLibrary;
@@ -105,12 +122,14 @@ export function TaskCard({
   selected?: boolean;
   onClick?: () => void;
   children?: ReactNode;
+  large?: boolean;
 }) {
+  const click = useClick("task", uid, onClick);
   const card = state.taskCards[uid]!;
   const def = lib.task(card.defKey);
   const raw = taskText.get(card.defKey);
   return (
-    <div className={`card task${selected ? " selected" : ""}`} onClick={onClick}>
+    <div className={`card task${selected ? " selected" : ""}${large ? " large" : ""}`} onClick={large ? undefined : click}>
       <div className="card-head">
         <span className="card-name">{def.name}</span>
         <span className={`badge type-${def.type}`}>{def.type}</span>
@@ -128,6 +147,8 @@ export function TaskCard({
             <RichText text={raw.specialRule} />
           </div>
         )}
+        {raw?.flavor && <div className="flavor">{raw.flavor}</div>}
+        {large && raw?.client && <div className="muted">委託人：{raw.client}</div>}
       </div>
       <div className="tokens">
         {timer !== undefined && <span className="token timer">{timer === null ? "[∞]" : `時限 [${timer}]`}</span>}
@@ -139,19 +160,38 @@ export function TaskCard({
   );
 }
 
-export function ItemCard({ state, uid, children }: { state: GameState; uid: string; children?: ReactNode }) {
+export function ItemCard({ state, uid, children, large }: { state: GameState; uid: string; children?: ReactNode; large?: boolean }) {
+  const click = useClick("item", uid);
   const item = state.itemCards[uid]!;
   const raw = itemText.get(item.name);
   return (
-    <div className="card item">
+    <div className={`card item${large ? " large" : ""}`} onClick={large ? undefined : click}>
       <div className="card-head">
         <span className="card-name">{item.name}</span>
         <span className="badge">售價 {raw?.price ?? 0}</span>
       </div>
       <div className="card-type">{raw?.categories.join("")}</div>
-      <div className="card-body">{raw?.effect && raw.effect !== "N/A" && <RichText text={raw.effect} />}</div>
+      <div className="card-body">
+        {raw?.effect && raw.effect !== "N/A" && <RichText text={raw.effect} />}
+        {raw?.flavor && <div className="flavor">{raw.flavor}</div>}
+      </div>
       <Tokens tokens={item.tokens} />
       {children && <div className="card-actions">{children}</div>}
+    </div>
+  );
+}
+
+/** 放大顯示的卡片：顯示完整的卡片文字。 */
+export function CardPreview({ state, lib, card, onClose }: { state: GameState; lib: CardLibrary; card: Inspected; onClose: () => void }) {
+  const exists =
+    card.kind === "adventurer" ? !!state.adventurerCards[card.uid] : card.kind === "task" ? !!state.taskCards[card.uid] : !!state.itemCards[card.uid];
+  if (!exists) return null;
+  return (
+    <div className="preview" role="dialog" aria-label="卡片放大">
+      <button className="preview-close" onClick={onClose} aria-label="關閉">關閉</button>
+      {card.kind === "adventurer" && <AdventurerCard state={state} lib={lib} uid={card.uid} large />}
+      {card.kind === "task" && <TaskCard state={state} lib={lib} uid={card.uid} large />}
+      {card.kind === "item" && <ItemCard state={state} uid={card.uid} large />}
     </div>
   );
 }

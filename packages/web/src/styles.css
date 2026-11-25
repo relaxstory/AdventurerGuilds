@@ -136,8 +136,25 @@ main section { background: var(--panel); border: 1px solid var(--line); border-r
   padding: 8px 10px; display: flex; flex-direction: column; gap: 4px; position: relative;
   transition: transform 0.12s ease, box-shadow 0.12s ease;
 }
-.card:hover { transform: scale(1.03); box-shadow: 0 6px 20px rgba(0,0,0,0.18); z-index: 2; }
-.card[onclick], .card.selectable { cursor: pointer; }
+.card:not(.large) { cursor: pointer; }
+.card:not(.large):hover { transform: scale(1.03); box-shadow: 0 6px 20px rgba(0,0,0,0.18); z-index: 2; }
+@media (prefers-reduced-motion: reduce) { .card { transition: none; } .card:not(.large):hover { transform: none; } }
+
+/* 點選卡片時放大顯示完整文字 */
+.preview {
+  position: fixed; z-index: 15;
+  right: max(16px, env(safe-area-inset-right, 0px));
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  width: min(380px, calc(100% - 32px)); max-height: calc(100vh - 120px);
+  overflow: auto; display: flex; flex-direction: column; gap: 8px; align-items: stretch;
+  filter: drop-shadow(0 12px 32px rgba(0,0,0,0.35));
+}
+.preview-close { align-self: flex-end; }
+.card.large { width: 100%; font-size: 15px; padding: 14px 16px; gap: 6px; }
+.card.large .card-name { font-size: 19px; }
+.card.large .card-type, .card.large .card-stats { font-size: 14px; }
+.card.large .card-body { max-height: none; overflow: visible; font-size: 15px; line-height: 1.65; }
+.card.large .story { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; white-space: pre-wrap; }
 .card.selected { outline: 3px solid var(--accent); }
 .card.tapped { opacity: 0.6; }
 .card.tapped .card-head::after { content: "↻"; position: absolute; right: 8px; top: 6px; }

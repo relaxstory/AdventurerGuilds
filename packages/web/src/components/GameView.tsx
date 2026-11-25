@@ -18,7 +18,8 @@ import {
   type PlayerState,
 } from "../../../engine/src/index.js";
 import { honorText } from "../data.js";
-import { AdventurerCard, ItemCard, TaskCard } from "./Cards.js";
+import { useEffect } from "react";
+import { AdventurerCard, CardPreview, InspectContext, ItemCard, TaskCard, type Inspected } from "./Cards.js";
 import { ActivateDialog, PendingPanel, UseItemDialog } from "./Dialogs.js";
 import { Rules } from "./Rules.js";
 
@@ -50,6 +51,12 @@ export function GameView({
   const [party, setParty] = useState<string[]>([]);
   const [confirmQuit, setConfirmQuit] = useState(false);
   const [showRules, setShowRules] = useState(false);
+  const [inspected, setInspected] = useState<Inspected | null>(null);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setInspected(null);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   const blocked = !!state.pending;
   const dispatch = () => {
@@ -59,6 +66,7 @@ export function GameView({
   };
 
   return (
+    <InspectContext.Provider value={setInspected}>
     <div className="game">
       <header className="topbar">
         <div>
@@ -142,7 +150,9 @@ export function GameView({
       {showRules && <Rules onClose={() => setShowRules(false)} />}
       {activating && <ActivateDialog state={state} lib={lib} card={activating.card} skill={activating.skill} act={act} onClose={() => setActivating(null)} />}
       {usingItem && state.itemCards[usingItem] && <UseItemDialog state={state} lib={lib} item={usingItem} act={act} onClose={() => setUsingItem(null)} />}
+      {inspected && <CardPreview state={state} lib={lib} card={inspected} onClose={() => setInspected(null)} />}
     </div>
+    </InspectContext.Provider>
   );
 }
 
