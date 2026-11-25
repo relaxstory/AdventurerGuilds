@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { GameConfig, HonorDraw, HonorMode } from "../../../engine/src/index.js";
+import { GAME_VERSION, type GameConfig, type HonorDraw, type HonorMode } from "../../../engine/src/index.js";
 import { builtAt } from "../data.js";
 import { Rules } from "./Rules.js";
 
@@ -14,7 +14,7 @@ export function Setup({ onStart, error }: { onStart: (c: GameConfig) => void; er
   return (
     <div className="setup">
       <div className="setup-head">
-        <h1>冒險者公會　測試模式</h1>
+        <h1>冒險者公會　測試模式 <small className="muted">{GAME_VERSION}</small></h1>
         <button onClick={() => setShowRules(true)}>簡易規則</button>
       </div>
       {showRules && <Rules onClose={() => setShowRules(false)} />}

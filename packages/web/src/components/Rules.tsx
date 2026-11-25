@@ -1,10 +1,11 @@
 /** 簡易規則（依 docs/spec.md 濃縮）。 */
+import { GAME_VERSION } from "../../../engine/src/index.js";
 export function Rules({ onClose }: { onClose: () => void }) {
   return (
     <div className="dialog-backdrop" onClick={onClose}>
       <div className="dialog rules" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="簡易規則">
         <div className="rules-head">
-          <h2>簡易規則</h2>
+          <h2>簡易規則 <small className="muted">{GAME_VERSION}</small></h2>
           <button onClick={onClose}>關閉</button>
         </div>
 

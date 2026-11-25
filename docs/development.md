@@ -35,7 +35,7 @@
 | `npm run sim -- 200` | 用 AI 玩家跑 200 局模擬，統計整體數據 |
 | `npm run cards:update` | 從 Google 試算表下載最新內容，產生卡片資料與檢查報告 |
 | `npm run cards:build` | 不下載，只用 `data/raw/` 的快照重新產生 |
-| `npm run cards:publish -- --name alpha1.0` | 把目前的卡片資料發布為新版本，`--name` 為版本名稱（省略時為 v1、v2…）。有錯誤時會拒絕發布 |
+| `npm run cards:publish -- --name alpha1.0` | 把目前的卡片資料發布為新版本，`--name` 為版本名稱（省略時為 v1、v2…）。有錯誤時會拒絕發布。只有卡片更新時不升內部版本號，見 `docs/versions.md` |
 
 `cards:update` 需要能連到 docs.google.com，試算表要開放「知道連結的人可以檢視」。
 

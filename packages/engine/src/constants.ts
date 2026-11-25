@@ -1,3 +1,6 @@
+/** 內部版本號：規則或架構調整時才升版，紀錄見 docs/versions.md。 */
+export const GAME_VERSION = "alpha1.1";
+
 /** 規則數值，出處見 docs/spec.md。 */
 export const RULES = {
   rounds: 8,

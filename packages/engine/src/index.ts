@@ -1,7 +1,7 @@
 export { Rng, type RngState } from "./rng.js";
 export { turnOptions, adjustCondition, meetsCondition, type Condition } from "./dice.js";
 export { CardLibrary, taskKey, type AdventurerDef, type TaskDef, type HonorDef, type ItemDef, type CardSource, type ClauseRow } from "./defs.js";
-export { RULES } from "./constants.js";
+export { GAME_VERSION, RULES } from "./constants.js";
 export { RuleError } from "./errors.js";
 export * from "./state.js";
 export { createGame } from "./setup.js";
