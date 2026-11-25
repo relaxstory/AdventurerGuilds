@@ -1,11 +1,17 @@
 {
-  "latest": 1,
+  "latest": 2,
   "history": [
     {
       "version": 1,
       "name": "alpha1.0",
       "publishedAt": "2026-11-24T14:27:36.259Z",
       "summary": "新增 134"
+    },
+    {
+      "version": 2,
+      "name": "alpha1.1",
+      "publishedAt": "2026-11-25T04:43:48.391Z",
+      "summary": "修改 1"
     }
   ]
 }
