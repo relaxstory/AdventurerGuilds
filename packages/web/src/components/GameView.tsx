@@ -70,12 +70,20 @@ export function GameView({
     };
   }, []);
 
+  // 換玩家、換階段或換輪時，清空選取的任務與冒險者（避免把上一位玩家選的冒險者一起派遣）
+  useEffect(() => {
+    setParty([]);
+    setTask(null);
+  }, [me.id, state.phase, state.round]);
+
   const blocked = !!state.pending;
   // 過勞死凱菲：本回合第一個任務必須派遣（付得出薪資時自動加入）
   const must = state.phase === "adventure" && me.missionsThisTurn === 0 ? ab.mustDispatch(state, lib, me) : [];
   const dispatch = () => {
-    const extra = must.filter((u) => !party.includes(u) && me.gold >= ab.salaryFor(state, lib, [...party, u]).total);
-    if (task && act({ type: "dispatch", task, adventurers: [...party, ...extra] })) {
+    // 只派遣目前玩家公會中、仍然直立的冒險者（選取後可能被橫置、解僱或銷毀）
+    const chosen = party.filter((u) => me.adventurers.includes(u) && !state.adventurerCards[u]?.tapped);
+    const extra = must.filter((u) => !chosen.includes(u) && me.gold >= ab.salaryFor(state, lib, [...chosen, u]).total);
+    if (task && act({ type: "dispatch", task, adventurers: [...chosen, ...extra] })) {
       setParty([]);
     }
   };
