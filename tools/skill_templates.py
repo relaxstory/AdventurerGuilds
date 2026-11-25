@@ -153,7 +153,9 @@ used = defaultdict(list)
 for row in M:
     assert row[5] in codes, row
     used[row[5]].append(row[1])
-unused = codes - set(used)
+# 已實作、等待新卡片使用的模板（新任務卡加入試算表後就會有卡片使用）
+PLANNED = {"TASK_MAX_PARTICIPANTS", "TASK_MIN_PARTICIPANTS", "TASK_REQUIRE_TRAIT", "TASK_REWARD_ITEM"}
+unused = codes - set(used) - PLANNED
 assert not unused, unused
 
 os.makedirs(os.path.join(ROOT, "data"), exist_ok=True)

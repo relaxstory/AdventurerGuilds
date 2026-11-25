@@ -749,6 +749,34 @@
     "params": "X＝特質"
   },
   {
+    "code": "TASK_MAX_PARTICIPANTS",
+    "name": "任務人數上限",
+    "type": "常駐",
+    "text": "參與此任務的冒險者不能超過{X}名。",
+    "params": "X＝人數（派遣當下；新兵小隊算 1 名，衍生物也算）"
+  },
+  {
+    "code": "TASK_MIN_PARTICIPANTS",
+    "name": "任務人數下限",
+    "type": "常駐",
+    "text": "參與此任務的冒險者至少需要{X}名。",
+    "params": "X＝人數（派遣當下；加入此次任務的冒險者不算）"
+  },
+  {
+    "code": "TASK_REQUIRE_TRAIT",
+    "name": "必須派遣特定特質",
+    "type": "常駐",
+    "text": "必須派遣具有{X}的冒險者參與。",
+    "params": "X＝特質（派遣當下；加入此次任務的冒險者不算）"
+  },
+  {
+    "code": "TASK_REWARD_ITEM",
+    "name": "完成時獲得道具",
+    "type": "觸發",
+    "text": "獲得【{X}】",
+    "params": "X＝道具名稱（額外獎勵欄；永久任務每次完成都會獲得）"
+  },
+  {
     "code": "TASK_EPIC",
     "name": "史詩任務",
     "type": "關鍵字",
