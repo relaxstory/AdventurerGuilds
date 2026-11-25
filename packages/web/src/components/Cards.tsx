@@ -74,9 +74,8 @@ export function AdventurerCard({
         {card.tapped && <span className="badge">橫置</span>}
         {card.derivative && <span className="badge alt">衍生物</span>}
       </div>
-      <div className="card-type">
-        {[face.race, face.profession].filter(Boolean).join("．")} {face.traits.join("")}
-      </div>
+      <div className="card-type">{[face.race, face.profession].filter(Boolean).join("．")}</div>
+      {face.traits.length > 0 && <div className="card-type traits">{face.traits.join("")}</div>}
       <div className="card-stats">
         <span title="基礎骰數">🎲 {dice}</span>
         <span title="薪資">💰 {salary}</span>
@@ -140,13 +139,13 @@ export function TaskCard({
         <span>⭐ {def.reputation ?? 0}</span>
       </div>
       <div className="card-type">{def.tags.join("")}</div>
+      {raw?.specialRule && raw.specialRule !== "N/A" && (
+        <div className="special-rule">
+          <RichText text={raw.specialRule} />
+        </div>
+      )}
       <div className="card-body">
         <RichText text={raw?.description ?? ""} />
-        {raw?.specialRule && raw.specialRule !== "N/A" && (
-          <div className="skill">
-            <RichText text={raw.specialRule} />
-          </div>
-        )}
         {raw?.flavor && <div className="flavor">{raw.flavor}</div>}
         {large && raw?.client && <div className="muted">委託人：{raw.client}</div>}
       </div>

@@ -91,6 +91,7 @@ export function createGame(config: GameConfig, source: CardSource): GameState {
     reputation: RULES.startReputation,
     distrust: 0,
     upgraded: false,
+    upgradeBonus: null,
     actionsLeft: RULES.guildActions,
     missionsThisTurn: 0,
     adventurers: [],

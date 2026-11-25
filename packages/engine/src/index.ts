@@ -8,6 +8,7 @@ export { createGame } from "./setup.js";
 export {
   applyAction,
   stagingSlots,
+  adventurerCapacity,
   upgradeCost,
   adventurerFace,
   salaryOf,
@@ -18,7 +19,7 @@ export {
   type ExpiryPenalty,
 } from "./actions.js";
 export { scoreGame, HONOR_RULES } from "./honors.js";
-export { botAction, simulate } from "./bot.js";
+export { botAction, botUpgradeBonus, simulate } from "./bot.js";
 export {
   adjustOptions,
   outcome,

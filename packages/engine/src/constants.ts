@@ -1,5 +1,5 @@
 /** 內部版本號：規則或架構調整時才升版，紀錄見 docs/versions.md。 */
-export const GAME_VERSION = "alpha1.1";
+export const GAME_VERSION = "alpha1.2";
 
 /** 規則數值，出處見 docs/spec.md。 */
 export const RULES = {
@@ -9,7 +9,9 @@ export const RULES = {
   guildActions: 3,
   adventurerCapacity: 5,
   itemSlots: 3,
-  stagingSlots: { base: 1, upgraded: 2 },
+  stagingSlots: { base: 1 },
+  /** 二階公會：升級時從三種加成選一種，各 +1 格（docs/spec.md 8.4）。 */
+  upgradeBonus: { adventurer: 1, staging: 1, item: 1 },
   boardSize: 5,
   tavernSize: 5,
   tavernDropPerRound: 2,

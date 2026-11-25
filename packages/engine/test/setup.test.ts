@@ -7,7 +7,7 @@ describe("開局", () => {
   it("每位玩家 5 金、0 聲望、沒有冒險者，公告欄與酒館各 5 張", () => {
     const { state } = setup();
     for (const p of state.players) {
-      expect(p).toMatchObject({ gold: 5, reputation: 0, adventurers: [], upgraded: false });
+      expect(p).toMatchObject({ gold: 5, reputation: 0, adventurers: [], upgraded: false, upgradeBonus: null });
     }
     expect(state.board.filter(Boolean)).toHaveLength(5);
     expect(state.tavern).toHaveLength(5);

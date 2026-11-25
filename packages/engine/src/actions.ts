@@ -7,7 +7,7 @@ import type { CardLibrary, TaskDef } from "./defs.js";
 import { RuleError } from "./errors.js";
 import { scoreGame } from "./honors.js";
 import { Rng } from "./rng.js";
-import { currentPlayer, currentPlayerIndex, type GameState, type PlayerState } from "./state.js";
+import { currentPlayer, currentPlayerIndex, type GameState, type PlayerState, type UpgradeBonus } from "./state.js";
 
 export type ExpiryPenalty = "gold" | "reputation";
 
@@ -47,14 +47,19 @@ export type Action =
   /** 公會整理階段：逾期懲罰金幣與聲望都能付時，由玩家選擇。 */
   | { readonly type: "choosePenalty"; readonly task: string; readonly penalty: ExpiryPenalty }
   /** 公會整理階段：升級公會。 */
-  | { readonly type: "upgrade" }
+  | { readonly type: "upgrade"; readonly bonus: UpgradeBonus }
   /** 公會整理階段：結束回合。 */
   | { readonly type: "endTurn" };
 
 // ── 查詢 ──
 
 export function stagingSlots(p: PlayerState): number {
-  return p.upgraded ? RULES.stagingSlots.upgraded : RULES.stagingSlots.base;
+  return RULES.stagingSlots.base + (p.upgradeBonus === "staging" ? RULES.upgradeBonus.staging : 0);
+}
+
+/** 冒險者區的容量：5 名，二階公會選擇冒險者格時 +1。 */
+export function adventurerCapacity(p: PlayerState): number {
+  return RULES.adventurerCapacity + (p.upgradeBonus === "adventurer" ? RULES.upgradeBonus.adventurer : 0);
 }
 
 export function upgradeCost(p: PlayerState): number {
@@ -156,8 +161,8 @@ export function applyAction(prev: GameState, action: Action, lib: CardLibrary): 
         ab.onReturnToTavern(state, lib, fired, p.id, log);
       } else {
         const counts = !ab.has(state, lib, uid, "NOT_COUNT_CAPACITY");
-        if (counts && ab.capacityUsed(state, lib, p) >= RULES.adventurerCapacity) {
-          throw new RuleError(`冒險者已達上限 ${RULES.adventurerCapacity} 名，請選擇要解僱的冒險者`);
+        if (counts && ab.capacityUsed(state, lib, p) >= adventurerCapacity(p)) {
+          throw new RuleError(`冒險者已達上限 ${adventurerCapacity(p)} 名，請選擇要解僱的冒險者`);
         }
         // 後面的冒險者依序往前補，從牌庫翻開新冒險者放到末端
         state.tavern.splice(action.tavernIndex, 1);
@@ -276,12 +281,15 @@ export function applyAction(prev: GameState, action: Action, lib: CardLibrary): 
     case "upgrade": {
       need("cleanup", "公會整理階段");
       requireExpiriesResolved(state, lib);
-      if (p.upgraded) throw new RuleError("公會已經升級過了");
+      if (p.upgraded) throw new RuleError("公會已經是二階公會了");
+      if (!(action.bonus in RULES.upgradeBonus)) throw new RuleError("請選擇升級加成：冒險者格、任務暫存格或道具格");
       const cost = upgradeCost(p);
       if (p.gold < cost) throw new RuleError(`金幣不足：升級需要 ${cost} 金`);
       p.gold -= cost;
       p.upgraded = true;
-      log(cost === 0 ? "完成 4 項任務，免費升級公會" : `花費 ${cost} 金升級公會`);
+      p.upgradeBonus = action.bonus;
+      const bonusLabel = { adventurer: "冒險者格 +1", staging: "任務暫存格 +1", item: "道具格 +1" }[action.bonus];
+      log(`${cost === 0 ? "完成 4 項任務，免費升級為二階公會" : `花費 ${cost} 金升級為二階公會`}（${bonusLabel}）`);
       break;
     }
 

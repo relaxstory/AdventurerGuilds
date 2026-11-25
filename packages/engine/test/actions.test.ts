@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { applyAction, type Action } from "../src/actions.js";
+import { adventurerCapacity, applyAction, stagingSlots, type Action } from "../src/actions.js";
+import { itemSlots } from "../src/items.js";
 import type { CardLibrary } from "../src/defs.js";
 import { RuleError } from "../src/errors.js";
 import { currentPlayer, type GameState } from "../src/state.js";
@@ -201,18 +202,32 @@ describe("公會整理階段", () => {
     expect(out.pendingExpiry).toEqual([]);
   });
 
+  it("二階公會：三種加成各 +1 格", () => {
+    const { state, lib } = setup();
+    const s = toCleanup(state, lib);
+    currentPlayer(s).completed = ["x1", "x2", "x3", "x4"];
+    const before = currentPlayer(s);
+    expect([stagingSlots(before), adventurerCapacity(before), itemSlots(s, lib, before)]).toEqual([1, 5, 3]);
+    const a = currentPlayer(run(s, lib, { type: "upgrade", bonus: "adventurer" }));
+    expect([stagingSlots(a), adventurerCapacity(a)]).toEqual([1, 6]);
+    const t = currentPlayer(run(s, lib, { type: "upgrade", bonus: "staging" }));
+    expect([stagingSlots(t), adventurerCapacity(t)]).toEqual([2, 5]);
+    const i = run(s, lib, { type: "upgrade", bonus: "item" });
+    expect(itemSlots(i, lib, currentPlayer(i))).toBe(4);
+  });
+
   it("升級費用：完成 4 項任務免費；|聲望| ≥ 5 為 3 金；否則 7 金", () => {
     const { state, lib } = setup();
     const s = toCleanup(state, lib);
     const p = currentPlayer(s);
-    expect(() => run(s, lib, { type: "upgrade" })).toThrow("升級需要 7 金");
+    expect(() => run(s, lib, { type: "upgrade", bonus: "staging" })).toThrow("升級需要 7 金");
     p.reputation = -5;
-    expect(currentPlayer(run(s, lib, { type: "upgrade" }))).toMatchObject({ gold: 2, upgraded: true });
+    expect(currentPlayer(run(s, lib, { type: "upgrade", bonus: "staging" }))).toMatchObject({ gold: 2, upgraded: true, upgradeBonus: "staging" });
     p.reputation = 0;
     p.completed = ["x1", "x2", "x3", "x4"];
-    const out = run(s, lib, { type: "upgrade" });
+    const out = run(s, lib, { type: "upgrade", bonus: "staging" });
     expect(currentPlayer(out)).toMatchObject({ gold: 5, upgraded: true });
-    expect(() => run(out, lib, { type: "upgrade" })).toThrow("已經升級過了");
+    expect(() => run(out, lib, { type: "upgrade", bonus: "item" })).toThrow("已經是二階公會");
   });
 });
 

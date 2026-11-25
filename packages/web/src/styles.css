@@ -167,7 +167,13 @@ main section { background: var(--panel); border: 1px solid var(--line); border-r
 .card-type { color: var(--muted); font-size: 12px; }
 .card-stats { display: flex; gap: 10px; font-size: 13px; }
 .card-stats .target { font-weight: 700; }
-.card-body { font-size: 12px; white-space: pre-wrap; max-height: 180px; overflow: auto; }
+.card-body { font-size: 12px; white-space: pre-wrap; max-height: 220px; overflow: auto; }
+.card-type.traits { margin-top: -2px; }
+.special-rule { font-size: 12px; font-weight: 700; background: var(--tag); border-left: 3px solid var(--accent); border-radius: 4px; padding: 4px 6px; white-space: pre-wrap; }
+.card.large .special-rule { font-size: 15px; padding: 8px 10px; }
+.honor-routes { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); gap: 4px 16px; }
+.honor-route h3 { margin: 4px 0; font-size: 14px; color: var(--muted); }
+.upgrade { display: inline-flex; gap: 6px; flex-wrap: wrap; align-items: center; }
 .skill { margin-top: 4px; }
 .flavor { font-style: italic; color: var(--muted); margin-top: 6px; }
 .squad { font-size: 12px; color: var(--accent); }

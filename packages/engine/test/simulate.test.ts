@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { applyAction, CardLibrary, createGame, RuleError } from "../src/index.js";
+import { abilities, adventurerCapacity, applyAction, CardLibrary, createGame, RuleError } from "../src/index.js";
+const capacityUsed = abilities.capacityUsed;
 import { simulate } from "../src/bot.js";
 import type { HonorMode } from "../src/state.js";
 import { config, source } from "./fixture.js";
@@ -26,7 +27,9 @@ describe("模擬整局", () => {
         abilityEvents += s.log.filter((l) => /不需橫置|指示物（共|重擲|轉成|移除|預言|：(金幣|聲望) [+-]/.test(l.text)).length;
         for (const p of s.players) {
           expect(p.gold).toBeGreaterThanOrEqual(0);
-          expect(p.adventurers.length).toBeLessThanOrEqual(5);
+          // 賴皮的勇者【賴著不走】會強制招募回公會，可能超過上限（設計待辦 docs/design-backlog.md）
+          const stubborn = p.adventurers.some((u) => abilities.faceOf(s, new CardLibrary(published, true), u).name === "那個賴皮的勇者");
+          if (!stubborn) expect(capacityUsed(s, new CardLibrary(published, true), p)).toBeLessThanOrEqual(adventurerCapacity(p));
           expect(p.distrust).toBeLessThanOrEqual(3);
         }
         // 卡片守恆：每張任務只會出現在一個地方

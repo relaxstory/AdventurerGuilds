@@ -105,13 +105,19 @@ export interface FormalTask {
   timer: number | null;
 }
 
+/** 二階公會的加成：冒險者格、任務暫存格或道具格 +1。 */
+export type UpgradeBonus = "adventurer" | "staging" | "item";
+
 export interface PlayerState {
   readonly id: string;
   readonly name: string;
   gold: number;
   reputation: number;
   distrust: number;
+  /** 已升級為二階公會。 */
   upgraded: boolean;
+  /** 升級時選擇的加成；尚未升級為 null。 */
+  upgradeBonus: UpgradeBonus | null;
   actionsLeft: number;
   /** 本回合已經執行的派遣次數。 */
   missionsThisTurn: number;

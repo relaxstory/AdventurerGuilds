@@ -3,16 +3,16 @@
  * 策略刻意保持單純，不代表最佳玩法。
  */
 import { RULES } from "./constants.js";
-import { adjustOptions, clauses, dispatchLimitProblem, squadKeyword, unitBaseDice, mustDispatch, outcome, participants, participationProblem, salaryFor } from "./abilities.js";
+import { adjustOptions, canBeFired, capacityUsed, clauses, has, dispatchLimitProblem, squadKeyword, unitBaseDice, mustDispatch, outcome, participants, participationProblem, salaryFor } from "./abilities.js";
 import { activatedSkills, activationImplemented } from "./activate.js";
 import { itemDef, sellPrice } from "./items.js";
 import { turnOptions } from "./dice.js";
-import { applyAction, stagingSlots, taskDef, upgradeCost, type Action, type ExpiryPenalty } from "./actions.js";
+import { adventurerCapacity, applyAction, stagingSlots, taskDef, upgradeCost, type Action, type ExpiryPenalty } from "./actions.js";
 import { RuleError } from "./errors.js";
 import type { CardLibrary, CardSource } from "./defs.js";
 import { CardLibrary as Library } from "./defs.js";
 import { createGame } from "./setup.js";
-import { currentPlayer, type GameConfig, type GameState } from "./state.js";
+import { currentPlayer, type GameConfig, type GameState, type PlayerState, type UpgradeBonus } from "./state.js";
 
 const value = (state: GameState, lib: CardLibrary, uid: string) => unitBaseDice(state, lib, uid) * 2 - salaryFor(state, lib, [uid]).total;
 
@@ -153,6 +153,11 @@ function botActivation(state: GameState, lib: CardLibrary, timing: "start" | "en
   return null;
 }
 
+/** AI 的升級加成選擇：冒險者已滿就加冒險者格，否則加任務暫存格。 */
+export function botUpgradeBonus(state: GameState, lib: CardLibrary, p: PlayerState): UpgradeBonus {
+  return capacityUsed(state, lib, p) >= adventurerCapacity(p) ? "adventurer" : "staging";
+}
+
 export function botAction(state: GameState, lib: CardLibrary): Action {
   if (state.pending) return botDecision(state, lib);
   const p = currentPlayer(state);
@@ -190,7 +195,15 @@ export function botAction(state: GameState, lib: CardLibrary): Action {
         if (best >= 0) return { type: "acceptTask", boardIndex: best };
         if ((state.config.taskSupply ?? RULES.taskSupply) === "deckTop" && state.taskDeck.length) return { type: "acceptTask", fromDeck: true };
       }
-      if (p.adventurers.length < 5 && recruitIndex >= 0) return { type: "recruit", tavernIndex: recruitIndex };
+      if (recruitIndex >= 0 && capacityUsed(state, lib, p) < adventurerCapacity(p)) return { type: "recruit", tavernIndex: recruitIndex };
+      // 冒險者已滿：酒館有明顯更好的冒險者時，解僱最弱的一名來換
+      if (recruitIndex >= 0) {
+        const candidate = value(state, lib, state.tavern[recruitIndex]!);
+        const weakest = p.adventurers
+          .filter((u) => !state.adventurerCards[u]!.derivative && !has(state, lib, u, "NOT_COUNT_CAPACITY") && canBeFired(state, lib, u) && !state.adventurerCards[u]!.squad?.length)
+          .sort((a, b) => value(state, lib, a) - value(state, lib, b))[0];
+        if (weakest && candidate >= value(state, lib, weakest) + 2) return { type: "recruit", tavernIndex: recruitIndex, replace: weakest };
+      }
       return { type: "endGuildPhase" };
     }
     case "adventure": {
@@ -227,7 +240,7 @@ export function botAction(state: GameState, lib: CardLibrary): Action {
         return !def.categories.includes("[狀態]") && lib.clauses(def).length === 0 && sellPrice(state, lib, p, u) > 0;
       });
       if (sellable) return { type: "sell", item: sellable };
-      if (!p.upgraded && upgradeCost(p) <= p.gold - 2) return { type: "upgrade" };
+      if (!p.upgraded && upgradeCost(p) <= p.gold - 2) return { type: "upgrade", bonus: botUpgradeBonus(state, lib, p) };
       return { type: "endTurn" };
     }
     case "gameOver":

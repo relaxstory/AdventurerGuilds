@@ -12,6 +12,7 @@ import {
   taskDef,
   turnOptions,
   upgradeCost,
+  adventurerCapacity,
   type Action,
   type CardLibrary,
   type GameState,
@@ -241,9 +242,9 @@ function Guild({
         <span>💰 {p.gold}</span>
         <span>⭐ 聲望 {p.reputation}</span>
         {p.distrust > 0 && <span className="warn">王國不信任 {p.distrust}</span>}
-        <span>{p.upgraded ? "已升級" : "初始公會"}</span>
+        <span>{p.upgraded ? `二階公會（${BONUS_LABEL[p.upgradeBonus ?? "staging"]}）` : "一階公會"}</span>
         <span>完成任務 {p.completed.length}</span>
-        <span>冒險者 {ab.capacityUsed(state, lib, p)}/{RULES.adventurerCapacity}</span>
+        <span>冒險者 {ab.capacityUsed(state, lib, p)}/{adventurerCapacity(p)}</span>
         <span>道具 {it.slottedItems(state, lib, p).length}/{slots}</span>
       </div>
 
@@ -376,7 +377,14 @@ function Cleanup({ state, lib, p, act }: { state: GameState; lib: CardLibrary; p
   }
   return (
     <>
-      {!p.upgraded && <button onClick={() => act({ type: "upgrade" })}>升級公會（{upgradeCost(p) === 0 ? "免費" : `${upgradeCost(p)} 金`}）</button>}
+      {!p.upgraded && (
+        <span className="upgrade">
+          升級為二階公會（{upgradeCost(p) === 0 ? "免費" : `${upgradeCost(p)} 金`}）：
+          {(["adventurer", "staging", "item"] as const).map((bonus) => (
+            <button key={bonus} onClick={() => act({ type: "upgrade", bonus })}>{BONUS_LABEL[bonus]}</button>
+          ))}
+        </span>
+      )}
       <button className="primary" onClick={() => act({ type: "endTurn" })}>結束回合</button>
     </>
   );
@@ -522,6 +530,19 @@ function Adjust({ state, lib, act }: { state: GameState; lib: CardLibrary; act: 
   );
 }
 
+const BONUS_LABEL = { adventurer: "冒險者格 +1", staging: "任務暫存格 +1", item: "道具格 +1" } as const;
+
+/** 依路線分組（路線順序依卡池順序），同一路線依編號排列。 */
+function byRoute(ids: readonly string[]): [string, string[]][] {
+  const routes = new Map<string, string[]>();
+  for (const id of [...ids].sort()) {
+    const route = honorText.get(id)?.route ?? "其他";
+    routes.set(route, [...(routes.get(route) ?? []), id]);
+  }
+  const order = [...new Set([...honorText.values()].map((h) => h.route))];
+  return [...routes.entries()].sort(([a], [b]) => order.indexOf(a) - order.indexOf(b));
+}
+
 function Honors({ state }: { state: GameState }) {
   if (state.config.honorMode === "assignment") {
     return (
@@ -535,18 +556,28 @@ function Honors({ state }: { state: GameState }) {
   return (
     <section>
       <h2>王國榮譽（{state.honors.length} 張{open ? "" : "，終局揭示"}）</h2>
-      <div className="honors">
-        {state.honors.map((h, i) => {
-          const t = honorText.get(h);
-          return open ? (
-            <span key={h} className="honor" title={t?.condition}>
-              {t?.name}（{t?.route}）
-            </span>
-          ) : (
+      {open ? (
+        <div className="honor-routes">
+          {byRoute(state.honors).map(([route, ids]) => (
+            <div key={route} className="honor-route">
+              <h3>{route}路線</h3>
+              <ul className="assigned">
+                {ids.map((h) => (
+                  <li key={h}>
+                    {honorText.get(h)?.name}：<b>{honorText.get(h)?.condition}</b>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="honors">
+          {state.honors.map((_, i) => (
             <span key={i} className="honor hidden">？</span>
-          );
-        })}
-      </div>
+          ))}
+        </div>
+      )}
     </section>
   );
 }
