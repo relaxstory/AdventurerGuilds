@@ -104,13 +104,17 @@ export function activate(state: GameState, lib: CardLibrary, rng: Rng, p: Player
   const effects = clauses.filter((c) => EFFECTS.has(c.code));
   const joining = effects.some((c) => c.code === "ADD_PARTICIPANT");
 
-  // 時機：只能在自己的回合（公會階段、冒險階段）；加入任務只能在派遣的組隊步驟
+  // 時機：卡片有寫時機的照卡片；其餘在冒險階段、派遣流程以外使用（docs/spec.md 13A）
   const timing = clauses.find((c) => c.code === "TIMING")?.x;
-  if (state.phase !== "guild" && state.phase !== "adventure") throw new RuleError("主動能力只能在公會階段或冒險階段使用");
-  if (timing === "公會階段" && state.phase !== "guild") throw new RuleError(`${label} 只能在公會階段使用`);
-  if (timing === "回合開始時" && !state.turnStartOpen) throw new RuleError(`${label} 只能在回合開始時使用`);
-  if (joining ? state.mission?.stage !== "assemble" : state.mission) {
-    throw new RuleError(joining ? `${label} 只能在派遣的組隊步驟使用` : "派遣進行中，不能發動這個能力");
+  if (timing === "公會階段") {
+    if (state.phase !== "guild") throw new RuleError(`${label} 只能在公會階段使用`);
+  } else if (timing === "回合開始時") {
+    if (!state.turnStartOpen) throw new RuleError(`${label} 只能在回合開始時使用`);
+  } else if (joining) {
+    if (state.mission?.stage !== "assemble") throw new RuleError(`${label} 只能在派遣中、擲骰前使用（加入此次任務）`);
+  } else {
+    if (state.phase !== "adventure") throw new RuleError(`${label} 只能在冒險階段使用`);
+    if (state.mission) throw new RuleError("派遣進行中，不能發動這個能力");
   }
 
   // 代價：冒號前面的部分必須付得出來

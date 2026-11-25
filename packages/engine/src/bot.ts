@@ -157,8 +157,6 @@ export function botAction(state: GameState, lib: CardLibrary): Action {
   const p = currentPlayer(state);
   switch (state.phase) {
     case "guild": {
-      const faith = p.items.filter((u) => state.itemCards[u]!.name === "火爪的信念");
-      if (faith.length >= 3) return { type: "useItem", item: faith[0]! };
       if (state.turnStartOpen) {
         const sleep = botActivation(state, lib, "start");
         if (sleep) return sleep;
@@ -192,6 +190,8 @@ export function botAction(state: GameState, lib: CardLibrary): Action {
     }
     case "adventure": {
       if (state.mission) return missionStep(state, lib);
+      const faith = p.items.filter((u) => state.itemCards[u]!.name === "火爪的信念");
+      if (faith.length >= 3) return { type: "useItem", item: faith[0]! };
       // 瑪絲珂：先從工作室創造小嗶，再派遣
       for (const uid of p.adventurers) {
         const card = state.adventurerCards[uid]!;

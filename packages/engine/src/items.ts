@@ -135,14 +135,13 @@ export interface UseItemParams {
  */
 export function useItem(state: GameState, lib: CardLibrary, p: PlayerState, a: UseItemParams, log: Log, rng?: Rng): void {
   if (!p.items.includes(a.item)) throw new RuleError("只能使用自己的道具");
-  if (state.phase !== "guild" && state.phase !== "adventure") throw new RuleError("道具只能在公會階段或冒險階段使用");
   const def = itemDef(state, lib, a.item);
   const clauses = itemClauses(state, lib, a.item);
   const label = `【${def.name}】`;
   const codes = clauses.map((c) => c.code);
 
   if (codes.includes("CONSUME_ALL_TIER_GAIN")) {
-    if (state.mission) throw new RuleError("派遣進行中，不能使用這個道具");
+    if (state.phase !== "adventure" || state.mission) throw new RuleError(`${label} 只能在冒險階段、派遣流程以外的時候使用`);
     const all = p.items.filter((u) => state.itemCards[u]!.name === def.name);
     for (const u of all) removeItem(state, p, u);
     const n = all.length;
@@ -155,12 +154,14 @@ export function useItem(state: GameState, lib: CardLibrary, p: PlayerState, a: U
   }
   if (!codes.includes("ITEM_CONSUME")) throw new RuleError(`${label} 不是可以使用的道具`);
 
-  const affectsDice = codes.includes("EFF_BASE_DICE_ROUND");
+  // 時機：卡片有寫時機的照卡片（希氏炸藥：本次任務的骰子總和，擲骰後）；
+  // 其餘在冒險階段、派遣流程以外使用（派遣 → 建立骰池 → 擲骰 → 結果是連續的動作）
   const tier = codes.includes("ITEM_TOKEN_TIER_RESULT");
-  // 派遣 → 建立骰池 → 擲骰 → 結果是連續的動作，影響骰數的道具只能在派遣流程以外的冒險階段使用
-  if (affectsDice && (state.phase !== "adventure" || state.mission)) throw new RuleError(`${label} 只能在冒險階段、派遣流程以外的時候使用`);
-  if (tier && state.mission?.stage !== "adjust") throw new RuleError(`${label} 只能在擲骰後使用`);
-  if (!affectsDice && !tier && state.mission) throw new RuleError("派遣進行中，不能使用這個道具");
+  if (tier) {
+    if (state.mission?.stage !== "adjust") throw new RuleError(`${label} 只能在擲骰後使用`);
+  } else if (state.phase !== "adventure" || state.mission) {
+    throw new RuleError(`${label} 只能在冒險階段、派遣流程以外的時候使用`);
+  }
 
   const needsTarget = codes.some((c) => c === "EFF_BASE_DICE_ROUND" || c === "EFF_RESET");
   const target = a.targets?.[0];

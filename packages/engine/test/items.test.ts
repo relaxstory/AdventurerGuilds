@@ -145,6 +145,15 @@ describe("使用道具", () => {
     expect(s.adventurerCards[foe!]!.tapped).toBe(true);
   });
 
+  it("道具只能在冒險階段、派遣流程以外使用（希氏炸藥除外）", () => {
+    const { state, lib } = adventure();
+    const [leon] = hire(state, "STD-C21");
+    const [potion] = give(state, lib, "伊蓮娜的精力藥劑");
+    const guild = structuredClone(state);
+    guild.phase = "guild";
+    expect(() => run(guild, lib, { type: "useItem", item: potion!, targets: [leon!] })).toThrow("冒險階段");
+  });
+
   it("精力藥劑：重置一名冒險者", () => {
     const { state, lib } = adventure();
     const [leon] = hire(state, "STD-C21");

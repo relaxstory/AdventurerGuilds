@@ -22,6 +22,15 @@ describe("主動能力：代價與效果", () => {
     expect(() => run(out, lib, act(eric!, "【晨間禱告】"))).toThrow("無法支付代價");
   });
 
+  it("沒有寫時機的主動能力只能在冒險階段使用，公會階段不行", () => {
+    const { state, lib } = adventure();
+    const [eric] = hire(state, "STD-C42");
+    const guild = structuredClone(state);
+    guild.phase = "guild";
+    expect(() => run(guild, lib, act(eric!, "【晨間禱告】"))).toThrow("只能在冒險階段使用");
+    expect(() => run(state, lib, act(eric!, "【晨間禱告】"))).not.toThrow();
+  });
+
   it("艾妲【今晚唱些老故事吧】：任務完成區每有 1 項任務，獲得 2 金", () => {
     const { state, lib } = adventure();
     const [ada] = hire(state, "STD-C36");
@@ -94,7 +103,7 @@ describe("主動能力：代價與效果", () => {
     expect(currentPlayer(s).gold).toBe(gold);
     s = run(s, lib, { type: "roll" });
     expect(s.mission!.pool).toBe(1 + 3);
-    expect(() => run(state, lib, act(reis!, "【空間傳送】", { targets: [john] }))).toThrow("組隊步驟");
+    expect(() => run(state, lib, act(reis!, "【空間傳送】", { targets: [john] }))).toThrow("派遣中、擲骰前");
   });
 });
 

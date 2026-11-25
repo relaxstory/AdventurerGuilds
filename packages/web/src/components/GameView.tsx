@@ -277,7 +277,16 @@ function Guild({
       <h3>冒險者</h3>
       <div className="cards">
         {p.adventurers.map((u) => {
-          const skills = [...activatedSkills(state, lib, u).keys()];
+          // 卡片有寫時機的照卡片（公會階段、回合開始時）；其餘在冒險階段、派遣流程以外；加入任務的能力在派遣面板中
+          const skills = [...activatedSkills(state, lib, u)]
+            .filter(([, cs]) => {
+              const timing = cs.find((c) => c.code === "TIMING")?.x;
+              if (cs.some((c) => c.code === "ADD_PARTICIPANT")) return false;
+              if (timing === "公會階段") return phase === "guild";
+              if (timing === "回合開始時") return state.turnStartOpen;
+              return phase === "adventure" && !state.mission;
+            })
+            .map(([s]) => s);
           const chosen = party.includes(u);
           return (
             <AdventurerCard
@@ -288,7 +297,7 @@ function Guild({
               selected={picking && (chosen || must.includes(u))}
               onClick={picking && !state.adventurerCards[u]!.tapped ? () => setParty(chosen ? party.filter((x) => x !== u) : [...party, u]) : undefined}
             >
-              {canAct && (phase === "guild" || phase === "adventure") &&
+              {canAct &&
                 skills.map((s) => (
                   <button key={s} onClick={() => onActivate(u, s)}>
                     發動{s}
@@ -306,7 +315,7 @@ function Guild({
           <div className="cards">
             {p.items.map((u) => (
               <ItemCard key={u} state={state} uid={u}>
-                {canAct && (phase === "guild" || phase === "adventure") && <ItemUse state={state} lib={lib} uid={u} act={act} onUseItem={onUseItem} />}
+                {canAct && phase === "adventure" && <ItemUse state={state} lib={lib} uid={u} act={act} onUseItem={onUseItem} />}
                 {canAct && phase === "cleanup" && !state.pendingExpiry.length && (
                   <button onClick={() => act({ type: "sell", item: u })}>出售（{it.sellPrice(state, lib, p, u)} 金）</button>
                 )}
@@ -340,10 +349,9 @@ function Guild({
 function ItemUse({ state, lib, uid, act, onUseItem }: { state: GameState; lib: CardLibrary; uid: string; act: Act; onUseItem: (item: string) => void }) {
   const codes = it.itemClauses(state, lib, uid).map((c) => c.code);
   if (!codes.includes("ITEM_CONSUME") && !codes.includes("CONSUME_ALL_TIER_GAIN")) return null;
-  // 影響骰數的道具：冒險階段、派遣流程以外；希氏炸藥：擲骰後（在派遣面板中使用）
-  if (codes.includes("EFF_BASE_DICE_ROUND") && (state.phase !== "adventure" || state.mission)) return null;
+  // 道具在冒險階段、派遣流程以外使用；希氏炸藥在擲骰後（在派遣面板中使用）
   if (codes.includes("ITEM_TOKEN_TIER_RESULT")) return null;
-  if (state.mission) return null;
+  if (state.phase !== "adventure" || state.mission) return null;
   const needsTarget = codes.some((c) => c === "EFF_BASE_DICE_ROUND" || c === "EFF_RESET");
   return <button onClick={() => (needsTarget ? onUseItem(uid) : act({ type: "useItem", item: uid }))}>使用</button>;
 }
