@@ -249,7 +249,7 @@ function Guild({
         <span>{p.upgraded ? `二階公會（${guildLabel(state, p.upgradeBonus ?? "staging")}）` : "一階公會"}</span>
         <span>完成任務 {p.completed.length}</span>
         <span>冒險者 {ab.capacityUsed(state, lib, p)}/{adventurerCapacity(p)}</span>
-        <span>道具 {it.slottedItems(state, lib, p).length}/{slots}</span>
+        <span title="相同道具堆疊在同一格">道具 {it.usedItemSlots(state, lib, p)}/{slots}</span>
       </div>
 
       {canAct && !(phase === "adventure" && state.mission) && (

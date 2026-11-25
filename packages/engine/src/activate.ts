@@ -6,7 +6,7 @@ import { RULES } from "./constants.js";
 import type { CardLibrary, ClauseDef } from "./defs.js";
 import { RuleError } from "./errors.js";
 import type { Rng } from "./rng.js";
-import { consumeCategory, countCategory, discardItem, gainItem, itemSlots, removeItem, slottedItems, splitList } from "./items.js";
+import { consumeCategory, countCategory, discardItem, gainItem, itemSlots, removeItem, slottedItems, splitList, usedItemSlots } from "./items.js";
 import { createDerivative, destroyAdventurer, destroyItem, finalizeDestroy } from "./lifecycle.js";
 import type { GameState, PlayerState } from "./state.js";
 
@@ -54,6 +54,8 @@ export type Decision =
   | { readonly option: "task"; readonly target: string }
   /** 選擇要銷毀的冒險者。 */
   | { readonly option: "destroy"; readonly target: string }
+  /** 選擇要解僱的冒險者（賴皮的勇者被額外招募、冒險者已滿時）。 */
+  | { readonly option: "fire"; readonly target: string }
   /** 是否使用替代效果。 */
   | { readonly option: "yes" }
   | { readonly option: "no" };
@@ -403,7 +405,7 @@ export function decide(state: GameState, lib: CardLibrary, d: Decision, log: (pl
       // 道具區超過上限的捨棄：輪到時依目前的道具重新判斷（先前的捨棄可能已經解決）
       const owner = state.players.find((x) => x.id === next.player)!;
       const slotted = slottedItems(state, lib, owner);
-      if (slotted.length <= itemSlots(state, lib, owner)) continue;
+      if (usedItemSlots(state, lib, owner) <= itemSlots(state, lib, owner)) continue;
       next = { ...next, items: slotted };
     }
     if (next.kind === "tapOrPay" || next.kind === "tapOrFlip") {
@@ -461,6 +463,8 @@ function resolveDecision(
     case "discardItem": {
       if (d.option !== "discard" || !pending.items.includes(d.target)) throw new RuleError("道具區已滿，請選擇一個道具捨棄");
       discardItem(state, lib, who, d.target, say);
+      // 相同道具堆疊：捨棄一個後仍然超過上限時，繼續捨棄
+      if (usedItemSlots(state, lib, who) > itemSlots(state, lib, who)) ab.pushPending(state, { kind: "discardItem", player: who.id, items: slottedItems(state, lib, who) });
       break;
     }
     case "chooseItem": {
@@ -496,6 +500,19 @@ function resolveDecision(
       const f = who.formal.find((x) => x.uid === d.target)!;
       f.timer = (f.timer ?? 0) + pending.amount;
       say(`「${lib.task(state.taskCards[d.target]!.defKey).name}」時限 +${pending.amount}`);
+      break;
+    }
+    case "fireForRecruit": {
+      if (d.option !== "fire" || !pending.candidates.includes(d.target) || !who.adventurers.includes(d.target)) throw new RuleError("請選擇一名要解僱的冒險者");
+      const j = state.tavern.indexOf(pending.recruit);
+      if (j < 0) break;
+      who.adventurers = who.adventurers.filter((u) => u !== d.target);
+      state.adventurerCards[d.target]!.tapped = false;
+      state.tavern[j] = d.target; // 被解僱的冒險者放進被招募者原本的位置（docs/spec.md 6.2）
+      who.adventurers.push(pending.recruit);
+      say(`招募 ${ab.faceOf(state, lib, pending.recruit).name}，解僱 ${ab.faceOf(state, lib, d.target).name}`);
+      ab.onReturnToTavern(state, lib, d.target, who.id, say);
+      ab.onRecruit(state, lib, who, pending.recruit, say);
       break;
     }
     case "destroyOwn": {

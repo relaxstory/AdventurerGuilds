@@ -6,6 +6,7 @@
  */
 import type { ClauseDef, CardLibrary, TaskDef } from "./defs.js";
 import { turnOptions } from "./dice.js";
+import { RULES } from "./constants.js";
 import { RuleError } from "./errors.js";
 import type { Rng } from "./rng.js";
 import { countCategory, consumeCategory, gainItem, splitList } from "./items.js";
@@ -45,6 +46,7 @@ export const IMPLEMENTED = new Set([
   "REPLACE_DESTROY_UNIQUE_ITEM", "ON_REP_DECREASE_DESTROY",
   // M3-4d：特殊能力
   "GUARD_REDIRECT", "EFF_FLIP_DOUBLE_TEMP", "EFF_COPY_ABILITY", "SHUFFLE_BACK_WITH", "TASK_AUTO_COMPLETE_TRAIT",
+  "TASK_MAX_PARTICIPANTS", "TASK_MIN_PARTICIPANTS", "TASK_REQUIRE_TRAIT", "TASK_REWARD_ITEM",
 ]);
 
 /**
@@ -317,11 +319,29 @@ export function flip(state: GameState, lib: CardLibrary, uid: string, flipper: s
     const i = state.tavern.indexOf(uid);
     const p = state.players.find((x) => x.id === flipper);
     if (i >= 0 && p) {
-      state.tavern.splice(i, 1);
-      const next = state.adventurerDeck.shift();
-      if (next) state.tavern.push(next);
-      p.adventurers.push(uid);
-      log(`${name} 賴著不走，被額外招募回公會`);
+      // 「再進行一次招募」：依招募規則，冒險者區已滿時必須解僱一名；沒有可以解僱的冒險者時，勇者進入冒險者棄置區
+      const capacity = RULES.adventurerCapacity + (p.upgradePerks?.adventurer ?? 0);
+      if (capacityUsed(state, lib, p) < capacity) {
+        state.tavern.splice(i, 1);
+        const next = state.adventurerDeck.shift();
+        if (next) state.tavern.push(next);
+        p.adventurers.push(uid);
+        log(`${name} 賴著不走，被額外招募回公會`);
+        onRecruit(state, lib, p, uid, log);
+      } else {
+        const candidates = p.adventurers.filter((u) => !state.adventurerCards[u]!.derivative && !has(state, lib, u, "NOT_COUNT_CAPACITY") && canBeFired(state, lib, u));
+        if (candidates.length) {
+          pushPending(state, { kind: "fireForRecruit", player: p.id, recruit: uid, candidates });
+          log(`${name} 賴著不走：冒險者已滿，必須解僱一名冒險者來招募他`);
+        } else {
+          state.tavern.splice(i, 1);
+          const next = state.adventurerDeck.shift();
+          if (next) state.tavern.push(next);
+          card.tokens = {};
+          state.adventurerDiscard.push(uid);
+          log(`${name} 賴著不走，但冒險者已滿且沒有可以解僱的冒險者，進入冒險者棄置區`);
+        }
+      }
     }
   }
 }
@@ -809,6 +829,30 @@ export function outcome(state: GameState, lib: CardLibrary, m: Mission): { faceS
     m.autoSuccess ||
     (c.op === "atLeast" ? result >= c.x - n : c.op === "atMost" ? result <= c.x + n : result >= c.x - n && result <= c.y + n);
   return { faceSum, result, n, success };
+}
+
+/** 派遣的冒險者（含小隊成員）是否有某個特質。 */
+const partyHasTrait = (state: GameState, lib: CardLibrary, party: readonly string[], trait: string) =>
+  party.some((u) => members(state, u).some((m) => faceOf(state, lib, m).traits.some((x) => bare(x) === bare(trait))));
+
+/**
+ * 任務的派遣條件（依派遣當下判定，docs/spec.md 7.1）：
+ * 人數上限／下限（新兵小隊算 1 名、衍生物也算；之後「加入此次任務」的冒險者不算），必須派遣具有某特質的冒險者。
+ */
+export function taskRequirementProblem(state: GameState, lib: CardLibrary, taskUid: string, party: readonly string[]): string | null {
+  const def = lib.task(state.taskCards[taskUid]!.defKey);
+  for (const c of lib.clauses(def)) {
+    if (c.code === "TASK_MAX_PARTICIPANTS" && party.length > Number(c.x)) return `「${def.name}」最多派遣 ${c.x} 名冒險者`;
+    if (c.code === "TASK_MIN_PARTICIPANTS" && party.length < Number(c.x)) return `「${def.name}」至少需要派遣 ${c.x} 名冒險者`;
+    if (c.code === "TASK_REQUIRE_TRAIT" && !partyHasTrait(state, lib, party, c.x)) return `「${def.name}」必須派遣具有${c.x}的冒險者`;
+  }
+  return null;
+}
+
+/** 完成任務時獲得的道具（額外獎勵「獲得【道具】」）。 */
+export function taskRewardItems(state: GameState, lib: CardLibrary, taskUid: string): string[] {
+  const def = lib.task(state.taskCards[taskUid]!.defKey);
+  return lib.clauses(def).filter((c) => c.code === "TASK_REWARD_ITEM").map((c) => c.x);
 }
 
 /** 送錯的軍令：派遣具有特定特質的冒險者參與時，可直接完成此任務（不擲骰）。 */

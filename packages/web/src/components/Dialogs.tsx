@@ -300,6 +300,20 @@ export function PendingPanel({ state, lib, act }: { state: GameState; lib: CardL
         </div>
       );
       break;
+    case "fireForRecruit":
+      body = (
+        <>
+          <p>{ab.faceOf(state, lib, pending.recruit).name} 賴著不走：冒險者已滿，請選擇一名要解僱的冒險者（他會回到酒館）。</p>
+          <div className="row wrap">
+            {pending.candidates.map((u) => (
+              <button key={u} onClick={() => decide({ option: "fire", target: u })}>
+                解僱 {advName(state, lib, u)}
+              </button>
+            ))}
+          </div>
+        </>
+      );
+      break;
     case "discardItem":
       body = (
         <>

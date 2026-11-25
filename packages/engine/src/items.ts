@@ -34,6 +34,11 @@ export function itemSlots(state: GameState, lib: CardLibrary, p: PlayerState): n
   return n;
 }
 
+/** 使用中的道具格數：相同名稱的道具堆疊在同一格（docs/spec.md 3.2）。 */
+export function usedItemSlots(state: GameState, lib: CardLibrary, p: PlayerState): number {
+  return new Set(slottedItems(state, lib, p).map((u) => state.itemCards[u]!.name)).size;
+}
+
 /** 佔用道具格的道具（[狀態] 道具不佔格）。 */
 export function slottedItems(state: GameState, lib: CardLibrary, p: PlayerState): string[] {
   return p.items.filter((u) => !isStatus(itemDef(state, lib, u)));
@@ -65,13 +70,15 @@ export function gainItem(state: GameState, lib: CardLibrary, p: PlayerState, nam
   // paid 方案：放進額外的道具格要付費，付不起就視為沒有額外的格子
   let slots = itemSlots(state, lib, p);
   const fee = p.upgradePerks?.paidExtra && p.upgradePerks.item ? p.upgradePerks.paidExtra : 0;
-  if (fee && !isStatus(def) && slotted.length === slots) {
+  const used = usedItemSlots(state, lib, p);
+  const stacked = slotted.filter((u) => state.itemCards[u]!.name === name).length > 1;
+  if (fee && !isStatus(def) && !stacked && used === slots) {
     if (p.gold >= fee) {
       p.gold -= fee;
       log(`使用額外的道具格，支付 ${fee} 金`);
     } else slots -= p.upgradePerks!.item;
   }
-  if (slotted.length > slots) {
+  if (used > slots) {
     ab.pushPending(state, { kind: "discardItem", player: p.id, items: slotted });
   }
   return uid;

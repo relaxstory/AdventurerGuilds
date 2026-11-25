@@ -5,7 +5,7 @@
 import { RULES } from "./constants.js";
 import { adjustOptions, canBeFired, capacityUsed, clauses, clausesOf, has, dispatchLimitProblem, squadKeyword, unitBaseDice, mustDispatch, outcome, participants, participationProblem, salaryFor } from "./abilities.js";
 import { activatedSkills, activationImplemented } from "./activate.js";
-import { itemDef, itemSlots, sellPrice, slottedItems } from "./items.js";
+import { itemDef, itemSlots, sellPrice, usedItemSlots } from "./items.js";
 import { turnOptions } from "./dice.js";
 import { adventurerCapacity, applyAction, stagingSlots, taskDef, upgradeCost, type Action, type ExpiryPenalty } from "./actions.js";
 import { RuleError } from "./errors.js";
@@ -142,6 +142,10 @@ function botDecision(state: GameState, lib: CardLibrary): Action {
   }
   if (pending.kind === "chooseWorkshop") return { type: "decide", decision: { option: "workshop", names: pending.options.slice(0, pending.count) } };
   if (pending.kind === "resetAdventurers") return { type: "decide", decision: { option: "reset", targets: pending.candidates.slice(0, pending.count) } };
+  if (pending.kind === "fireForRecruit") {
+    const weakest = [...pending.candidates].sort((a, b) => value(state, lib, a) - value(state, lib, b))[0]!;
+    return { type: "decide", decision: { option: "fire", target: weakest } };
+  }
   if (pending.kind === "extendTask") return { type: "decide", decision: { option: "task", target: pending.candidates[0]! } };
   if (pending.kind === "confirmReplace") return { type: "decide", decision: { option: pending.what === "adventurer" ? "yes" : "no" } };
   if (pending.kind === "destroyOwn") {
@@ -208,7 +212,7 @@ export function botUpgradeBonus(state: GameState, lib: CardLibrary, p: PlayerSta
   if (variant === "guildType") {
     // 道具相關能力多、或道具區已滿 → 經濟型；冒險者已滿且棄置區有好人選 → 冒險者型；否則任務型
     const itemSkills = p.adventurers.filter((u) => clausesOf(state, lib, u).some((c) => /ITEM|SELL_PRICE/.test(c.code))).length;
-    if (itemSkills >= 2 || slottedItems(state, lib, p).length >= itemSlots(state, lib, p)) return "economy";
+    if (itemSkills >= 2 || usedItemSlots(state, lib, p) >= itemSlots(state, lib, p)) return "economy";
     const pick = botDiscardPick(state, lib);
     const weakest = Math.min(...p.adventurers.map((u) => value(state, lib, u)));
     if (honorsVisible(state)) {

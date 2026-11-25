@@ -241,8 +241,8 @@ describe("排隊中的道具捨棄", () => {
     const p = currentPlayer(state);
     const names = [...lib.items.keys()].filter((n) => !lib.item(n).categories.some((c) => c.includes("狀態")) && !lib.item(n).categories.some((c) => c.includes("獨特")));
     for (const n of names.slice(0, 2)) gainItem(state, lib, p, n, () => {});
-    gainItem(state, lib, p, names[0]!, () => {}); // 第 3 個：超過 2 格，需要捨棄
-    gainItem(state, lib, p, names[1]!, () => {}); // 第 4 個：排隊
+    gainItem(state, lib, p, names[2]!, () => {}); // 第 3 種：超過 2 格，需要捨棄
+    gainItem(state, lib, p, names[3]!, () => {}); // 第 4 種：排隊
     expect(state.pending?.kind).toBe("discardItem");
     expect(state.pendingQueue).toHaveLength(1);
     // 第一次捨棄後仍超量 → 第二次捨棄的清單要是目前的道具

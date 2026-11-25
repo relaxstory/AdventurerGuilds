@@ -188,6 +188,8 @@ export type Pending =
   | { readonly kind: "resetAdventurers"; readonly player: string; readonly source: string; readonly count: number; readonly candidates: readonly string[] }
   /** 蕾的和弦：選擇一個任務時限 +amount；可以不選。 */
   | { readonly kind: "extendTask"; readonly player: string; readonly source: string; readonly amount: number; readonly candidates: readonly string[] }
+  /** 賴皮的勇者被額外招募、冒險者已滿：從 candidates 中解僱一名，招募 recruit。 */
+  | { readonly kind: "fireForRecruit"; readonly player: string; readonly recruit: string; readonly candidates: readonly string[] }
   /** 梅里妲的注視：銷毀自己公會中的一名冒險者。 */
   | { readonly kind: "destroyOwn"; readonly player: string; readonly source: string; readonly candidates: readonly string[] }
   /** 是否使用「你可以改為銷毀……」的替代效果。 */

@@ -1,6 +1,6 @@
 import * as ab from "./abilities.js";
 import { activate, activatedSkills, decide, type ActivateParams, type Decision } from "./activate.js";
-import { sellItem, useItem, type UseItemParams } from "./items.js";
+import { gainItem, sellItem, useItem, type UseItemParams } from "./items.js";
 import { afterSettle, checkReputationDrops, onTurnStart, roundEndDestroy } from "./lifecycle.js";
 import { RULES } from "./constants.js";
 import type { CardLibrary, TaskDef } from "./defs.js";
@@ -173,6 +173,7 @@ export function applyAction(prev: GameState, action: Action, lib: CardLibrary): 
         ab.onRecruit(state, lib, p, uid, log);
         break;
       }
+      let returning: string | null = null;
       if (action.replace !== undefined) {
         const i = p.adventurers.indexOf(action.replace);
         if (i < 0) throw new RuleError("只能解僱自己公會中的冒險者");
@@ -183,7 +184,7 @@ export function applyAction(prev: GameState, action: Action, lib: CardLibrary): 
         // 被解僱的冒險者放進被招募者原本的位置，不從牌庫補牌（docs/spec.md 6.2）
         state.tavern[action.tavernIndex] = fired;
         log(`招募 ${name}，解僱 ${adventurerFace(state, lib, fired).name}`);
-        ab.onReturnToTavern(state, lib, fired, p.id, log);
+        returning = fired; // 招募完成後才處理回到酒館的效果（勇者翻面時，新冒險者已經在公會中）
       } else {
         const counts = !ab.has(state, lib, uid, "NOT_COUNT_CAPACITY");
         if (counts && ab.capacityUsed(state, lib, p) >= adventurerCapacity(p)) {
@@ -206,6 +207,7 @@ export function applyAction(prev: GameState, action: Action, lib: CardLibrary): 
       p.adventurers.push(uid);
       if (!free) p.actionsLeft -= 1;
       ab.onRecruit(state, lib, p, uid, log);
+      if (returning) ab.onReturnToTavern(state, lib, returning, p.id, log);
       break;
     }
 
@@ -384,7 +386,7 @@ function startMission(state: GameState, lib: CardLibrary, p: PlayerState, taskUi
     if (!p.adventurers.includes(uid)) throw new RuleError("只能派遣自己公會中的冒險者");
     if (state.adventurerCards[uid]!.tapped) throw new RuleError(`${adventurerFace(state, lib, uid).name} 已經橫置，不能派遣`);
   }
-  const problem = ab.participationProblem(state, lib, party) ?? ab.dispatchLimitProblem(state, lib, party);
+  const problem = ab.participationProblem(state, lib, party) ?? ab.dispatchLimitProblem(state, lib, party) ?? ab.taskRequirementProblem(state, lib, taskUid, party);
   if (problem) throw new RuleError(problem);
 
   const { total: salary } = ab.salaryFor(state, lib, party);
@@ -447,6 +449,8 @@ function resolveMission(state: GameState, lib: CardLibrary, p: PlayerState, m: N
     if (p.distrust > 0) p.distrust -= 1; // 先用目前層數扣報酬，再消除 1 層
     const how = m.autoSuccess ? (m.dice.length ? "視為成功" : "直接完成") : `結果值 ${result}，目標 ${condText}${adjText}：成功`;
     log(`「${def.name}」${how}，獲得 ${gold} 金、聲望 ${signed(def.reputation ?? 0)}`, m.dice.length ? [...m.dice] : undefined);
+    // 額外獎勵：完成時獲得道具（永久任務每次完成都會獲得）
+    for (const name of ab.taskRewardItems(state, lib, taskUid)) gainItem(state, lib, p, name, log);
   } else {
     log(`「${def.name}」結果值 ${result}，目標 ${condText}${adjText}：失敗`, [...m.dice]);
   }
