@@ -208,7 +208,7 @@ function planEffects(
       case "EFF_RETRIEVE_TASK": {
         const t = a.task;
         if (!t || !state.taskDiscard.includes(t)) throw new RuleError(`${label}：請從任務棄置區選擇一張任務`);
-        const stagingMax = RULES.stagingSlots.base + (p.upgradeBonus === "staging" ? RULES.upgradeBonus.staging : 0);
+        const stagingMax = RULES.stagingSlots.base + (p.upgradePerks?.staging ?? 0);
         if (p.staging.length >= stagingMax) throw new RuleError(`${label}：任務暫存格已滿`);
         plan.push(() => {
           state.taskDiscard = state.taskDiscard.filter((x) => x !== t);

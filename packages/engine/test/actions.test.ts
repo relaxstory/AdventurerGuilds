@@ -216,6 +216,26 @@ describe("公會整理階段", () => {
     expect(itemSlots(i, lib, currentPlayer(i))).toBe(4);
   });
 
+  it("升級方案（試驗）：冒險者格 +2、專精、付費格子", () => {
+    const make = (upgradeVariant: "adventurer2" | "specialize" | "paid") => {
+      const { state, lib } = setup();
+      (state as { config: unknown }).config = { ...state.config, upgradeVariant };
+      const s = toCleanup(state, lib);
+      currentPlayer(s).completed = ["x1", "x2", "x3", "x4"];
+      return { s, lib };
+    };
+    const a = make("adventurer2");
+    expect(adventurerCapacity(currentPlayer(run(a.s, a.lib, { type: "upgrade", bonus: "adventurer" })))).toBe(7);
+    const b = make("specialize");
+    expect(() => run(b.s, b.lib, { type: "upgrade", bonus: "staging" })).toThrow("專精");
+    const t = currentPlayer(run(b.s, b.lib, { type: "upgrade", bonus: "task" }));
+    expect([stagingSlots(t), t.upgradePerks?.timer, t.upgradePerks?.extraAttempt]).toEqual([2, 1, 1]);
+    const c = make("paid");
+    const out = run(c.s, c.lib, { type: "upgrade", bonus: "staging" });
+    const p = currentPlayer(out);
+    expect([stagingSlots(p), p.upgradePerks?.paidExtra]).toEqual([2, 2]);
+  });
+
   it("升級費用：完成 4 項任務免費；|聲望| ≥ 5 為 3 金；否則 7 金", () => {
     const { state, lib } = setup();
     const s = toCleanup(state, lib);

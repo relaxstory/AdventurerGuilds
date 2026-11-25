@@ -28,7 +28,7 @@ const isUnique = (d: ItemDef) => d.categories.some((c) => bare(c) === "獨特");
 
 /** 道具區的格數：基本 3 格，二階公會選擇道具格時 +1，再加上能力（法的和弦）。 */
 export function itemSlots(state: GameState, lib: CardLibrary, p: PlayerState): number {
-  let n = RULES.itemSlots + (p.upgradeBonus === "item" ? RULES.upgradeBonus.item : 0);
+  let n = RULES.itemSlots + (p.upgradePerks?.item ?? 0);
   for (const u of p.adventurers) for (const c of ab.clauses(state, lib, u, "EXTRA_ITEM_SLOT")) n += ab.amount(state, lib, u, c.x);
   return n;
 }
@@ -61,7 +61,16 @@ export function gainItem(state: GameState, lib: CardLibrary, p: PlayerState, nam
   p.items.push(uid);
   log(`獲得【${name}】`);
   const slotted = slottedItems(state, lib, p);
-  if (slotted.length > itemSlots(state, lib, p)) {
+  // paid 方案：放進額外的道具格要付費，付不起就視為沒有額外的格子
+  let slots = itemSlots(state, lib, p);
+  const fee = p.upgradePerks?.paidExtra && p.upgradePerks.item ? p.upgradePerks.paidExtra : 0;
+  if (fee && !isStatus(def) && slotted.length === slots) {
+    if (p.gold >= fee) {
+      p.gold -= fee;
+      log(`使用額外的道具格，支付 ${fee} 金`);
+    } else slots -= p.upgradePerks!.item;
+  }
+  if (slotted.length > slots) {
     ab.pushPending(state, { kind: "discardItem", player: p.id, items: slotted });
   }
   return uid;
@@ -96,7 +105,7 @@ export function countCategory(state: GameState, lib: CardLibrary, p: PlayerState
 /** 出售價格：售價加上能力修正（漢克【農莊加工】）。 */
 export function sellPrice(state: GameState, lib: CardLibrary, p: PlayerState, uid: string): number {
   const def = itemDef(state, lib, uid);
-  let price = def.price ?? 0;
+  let price = (def.price ?? 0) + (p.upgradePerks?.sellBonus ?? 0);
   for (const u of p.adventurers) {
     for (const c of ab.clauses(state, lib, u, "SELL_PRICE_MOD")) {
       if (splitList(c.x).some((x) => def.categories.some((d) => bare(d) === bare(x)))) price += ab.amount(state, lib, u, c.y);

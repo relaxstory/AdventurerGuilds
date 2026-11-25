@@ -10,8 +10,10 @@ export const RULES = {
   adventurerCapacity: 5,
   itemSlots: 3,
   stagingSlots: { base: 1 },
-  /** 二階公會：升級時從三種加成選一種，各 +1 格（docs/spec.md 8.4）。 */
-  upgradeBonus: { adventurer: 1, staging: 1, item: 1 },
+  /** 二階公會升級方案（docs/spec.md 8.4）。 */
+  upgradeVariant: "choice" as "choice" | "adventurer2" | "specialize" | "paid",
+  /** paid 方案：使用額外格子時支付的金幣。 */
+  upgradePaidCost: 2,
   boardSize: 5,
   tavernSize: 5,
   tavernDropPerRound: 2,

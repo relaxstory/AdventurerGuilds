@@ -21,6 +21,8 @@ export interface GameConfig {
   readonly rounds?: number;
   /** 輪末補助的金幣下限，預設 RULES.roundEndGoldFloor；0 表示關閉。 */
   readonly goldFloor?: number;
+  /** 二階公會升級方案（試驗中），預設 RULES.upgradeVariant。 */
+  readonly upgradeVariant?: UpgradeVariant;
   /** 任務供應方式（試驗中）：預設 RULES.taskSupply。board＝只從公告欄拿；deckTop＝也可以拿牌庫頂；refill＝每個玩家回合開始時補滿公告欄。 */
   readonly taskSupply?: "board" | "deckTop" | "refill";
 }
@@ -106,7 +108,30 @@ export interface FormalTask {
 }
 
 /** 二階公會的加成：冒險者格、任務暫存格或道具格 +1。 */
-export type UpgradeBonus = "adventurer" | "staging" | "item";
+export type UpgradeBonus = "adventurer" | "staging" | "item" | "task";
+
+/**
+ * 二階公會升級方案（試驗中，docs/versions.md alpha1.2）：
+ * choice＝三選一各 +1；adventurer2＝冒險者格改為 +2；specialize＝固定暫存格 +1 再選專精；paid＝三選一，使用額外格子要付 2 金。
+ */
+export type UpgradeVariant = "choice" | "adventurer2" | "specialize" | "paid";
+
+/** 升級後的效果，在升級時依方案計算後存下來。 */
+export interface UpgradePerks {
+  readonly adventurer: number;
+  readonly staging: number;
+  readonly item: number;
+  /** 每回合第一次招募不消耗公會行動。 */
+  readonly freeRecruit?: boolean;
+  /** 任務移入正式任務區時，時限 +N。 */
+  readonly timer?: number;
+  /** 任務失敗時，額外獲得 N 個嘗試指示物。 */
+  readonly extraAttempt?: number;
+  /** 出售道具時，額外獲得 N 金。 */
+  readonly sellBonus?: number;
+  /** 使用額外格子時要付金幣（冒險者格只在第一次使用時付）。 */
+  readonly paidExtra?: number;
+}
 
 export interface PlayerState {
   readonly id: string;
@@ -118,6 +143,11 @@ export interface PlayerState {
   upgraded: boolean;
   /** 升級時選擇的加成；尚未升級為 null。 */
   upgradeBonus: UpgradeBonus | null;
+  upgradePerks: UpgradePerks | null;
+  /** 本回合已經用過「第一次招募不消耗公會行動」。 */
+  freeRecruitUsed: boolean;
+  /** 已經為額外的冒險者格付過費用。 */
+  paidAdventurerSlot: boolean;
   actionsLeft: number;
   /** 本回合已經執行的派遣次數。 */
   missionsThisTurn: number;

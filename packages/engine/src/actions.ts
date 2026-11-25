@@ -7,7 +7,7 @@ import type { CardLibrary, TaskDef } from "./defs.js";
 import { RuleError } from "./errors.js";
 import { scoreGame } from "./honors.js";
 import { Rng } from "./rng.js";
-import { currentPlayer, currentPlayerIndex, type GameState, type PlayerState, type UpgradeBonus } from "./state.js";
+import { currentPlayer, currentPlayerIndex, type GameState, type PlayerState, type UpgradeBonus, type UpgradePerks, type UpgradeVariant } from "./state.js";
 
 export type ExpiryPenalty = "gold" | "reputation";
 
@@ -54,12 +54,27 @@ export type Action =
 // ── 查詢 ──
 
 export function stagingSlots(p: PlayerState): number {
-  return RULES.stagingSlots.base + (p.upgradeBonus === "staging" ? RULES.upgradeBonus.staging : 0);
+  return RULES.stagingSlots.base + (p.upgradePerks?.staging ?? 0);
 }
 
 /** 冒險者區的容量：5 名，二階公會選擇冒險者格時 +1。 */
 export function adventurerCapacity(p: PlayerState): number {
-  return RULES.adventurerCapacity + (p.upgradeBonus === "adventurer" ? RULES.upgradeBonus.adventurer : 0);
+  return RULES.adventurerCapacity + (p.upgradePerks?.adventurer ?? 0);
+}
+
+/** 依升級方案計算二階公會的效果。 */
+export function upgradePerks(variant: UpgradeVariant, bonus: UpgradeBonus): UpgradePerks {
+  const none = { adventurer: 0, staging: 0, item: 0 };
+  if (variant === "specialize") {
+    if (bonus === "staging") throw new RuleError("專精請選擇：冒險者、任務或道具（任務暫存格 +1 已固定獲得）");
+    const base = { ...none, staging: 1 };
+    if (bonus === "adventurer") return { ...base, adventurer: 1, freeRecruit: true };
+    if (bonus === "task") return { ...base, timer: 1, extraAttempt: 1 };
+    return { ...base, item: 1, sellBonus: 1 };
+  }
+  if (bonus === "task") throw new RuleError("請選擇升級加成：冒險者格、任務暫存格或道具格");
+  const perks = { ...none, [bonus]: bonus === "adventurer" && variant === "adventurer2" ? 2 : 1 };
+  return variant === "paid" ? { ...perks, paidExtra: RULES.upgradePaidCost } : perks;
 }
 
 export function upgradeCost(p: PlayerState): number {
@@ -118,8 +133,10 @@ export function applyAction(prev: GameState, action: Action, lib: CardLibrary): 
       need("guild", "公會階段");
       const uid = state.tavern[action.tavernIndex];
       if (!uid) throw new RuleError("酒館的這個位置沒有冒險者");
-      const free = ab.freeRecruit(state, lib, p, uid);
+      const perkFree = !ab.freeRecruit(state, lib, p, uid) && !!p.upgradePerks?.freeRecruit && !p.freeRecruitUsed;
+      const free = ab.freeRecruit(state, lib, p, uid) || perkFree;
       if (!free && p.actionsLeft < 1) throw new RuleError("本回合的公會行動已經用完");
+      if (perkFree) p.freeRecruitUsed = true;
       const name = adventurerFace(state, lib, uid).name;
       if (action.squad) {
         if (action.replace !== undefined) throw new RuleError("加入小隊時不需要解僱冒險者");
@@ -164,6 +181,14 @@ export function applyAction(prev: GameState, action: Action, lib: CardLibrary): 
         if (counts && ab.capacityUsed(state, lib, p) >= adventurerCapacity(p)) {
           throw new RuleError(`冒險者已達上限 ${adventurerCapacity(p)} 名，請選擇要解僱的冒險者`);
         }
+        // paid 方案：第一次使用額外的冒險者格時付費
+        const fee = p.upgradePerks?.paidExtra ?? 0;
+        if (counts && fee && !p.paidAdventurerSlot && ab.capacityUsed(state, lib, p) >= RULES.adventurerCapacity) {
+          if (p.gold < fee) throw new RuleError(`第一次使用額外的冒險者格需要支付 ${fee} 金`);
+          p.gold -= fee;
+          p.paidAdventurerSlot = true;
+          log(`第一次使用額外的冒險者格，支付 ${fee} 金`);
+        }
         // 後面的冒險者依序往前補，從牌庫翻開新冒險者放到末端
         state.tavern.splice(action.tavernIndex, 1);
         const next = state.adventurerDeck.shift();
@@ -180,6 +205,9 @@ export function applyAction(prev: GameState, action: Action, lib: CardLibrary): 
       need("guild", "公會階段");
       if (p.actionsLeft < 1) throw new RuleError("本回合的公會行動已經用完");
       if (p.staging.length >= stagingSlots(p)) throw new RuleError("任務暫存格已滿");
+      // paid 方案：使用額外的暫存格要付費
+      const stagingFee = p.upgradePerks?.paidExtra && p.staging.length >= RULES.stagingSlots.base ? p.upgradePerks.paidExtra : 0;
+      if (p.gold < stagingFee) throw new RuleError(`使用額外的任務暫存格需要支付 ${stagingFee} 金`);
       let uid: string | null | undefined;
       if ("fromDeck" in action) {
         if ((state.config.taskSupply ?? RULES.taskSupply) !== "deckTop") throw new RuleError("目前的規則不能從任務牌庫拿取");
@@ -192,6 +220,10 @@ export function applyAction(prev: GameState, action: Action, lib: CardLibrary): 
       }
       p.staging.push(uid);
       p.actionsLeft -= 1;
+      if (stagingFee) {
+        p.gold -= stagingFee;
+        log(`使用額外的任務暫存格，支付 ${stagingFee} 金`);
+      }
       log(`接取任務「${taskDef(state, lib, uid).name}」${"fromDeck" in action ? "（任務牌庫頂）" : ""}`);
       break;
     }
@@ -282,13 +314,14 @@ export function applyAction(prev: GameState, action: Action, lib: CardLibrary): 
       need("cleanup", "公會整理階段");
       requireExpiriesResolved(state, lib);
       if (p.upgraded) throw new RuleError("公會已經是二階公會了");
-      if (!(action.bonus in RULES.upgradeBonus)) throw new RuleError("請選擇升級加成：冒險者格、任務暫存格或道具格");
+      const perks = upgradePerks(state.config.upgradeVariant ?? RULES.upgradeVariant, action.bonus);
       const cost = upgradeCost(p);
       if (p.gold < cost) throw new RuleError(`金幣不足：升級需要 ${cost} 金`);
       p.gold -= cost;
       p.upgraded = true;
       p.upgradeBonus = action.bonus;
-      const bonusLabel = { adventurer: "冒險者格 +1", staging: "任務暫存格 +1", item: "道具格 +1" }[action.bonus];
+      p.upgradePerks = perks;
+      const bonusLabel = { adventurer: "冒險者", staging: "任務暫存格", item: "道具", task: "任務" }[action.bonus];
       log(`${cost === 0 ? "完成 4 項任務，免費升級為二階公會" : `花費 ${cost} 金升級為二階公會`}（${bonusLabel}）`);
       break;
     }
@@ -415,7 +448,7 @@ function resolveMission(state: GameState, lib: CardLibrary, p: PlayerState, m: N
     removeTask(p, taskUid);
     state.taskDiscard.push(taskUid);
   } else {
-    card.attempts += 1;
+    card.attempts += 1 + (p.upgradePerks?.extraAttempt ?? 0);
     log(`「${def.name}」獲得嘗試指示物（共 ${card.attempts} 枚）`);
   }
   state.mission = null;
@@ -485,7 +518,8 @@ function resolveExpiries(state: GameState, lib: CardLibrary, p: PlayerState, log
 
   for (const uid of p.staging) {
     const def = taskDef(state, lib, uid);
-    p.formal.push({ uid, timer: def.type in RULES.timer ? (RULES.timer[def.type] ?? null) : 3 });
+    const timer = def.type in RULES.timer ? (RULES.timer[def.type] ?? null) : 3;
+    p.formal.push({ uid, timer: timer === null ? null : timer + (p.upgradePerks?.timer ?? 0) });
   }
   p.staging = [];
   // 4. 出售道具（道具在 M3 實作）；5. 公會升級由玩家以 upgrade 操作執行
@@ -508,6 +542,7 @@ function beginTurn(state: GameState, lib: CardLibrary): void {
   const p = currentPlayer(state);
   p.actionsLeft = RULES.guildActions;
   p.missionsThisTurn = 0;
+  p.freeRecruitUsed = false;
   if ((state.config.taskSupply ?? RULES.taskSupply) === "refill") {
     // 試驗方案「回合開始補滿」：公告欄的空位從任務牌庫補滿
     state.board = state.board.map((uid) => uid ?? state.taskDeck.shift() ?? null);

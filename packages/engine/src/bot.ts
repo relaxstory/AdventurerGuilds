@@ -158,7 +158,9 @@ export const BOT_MISSION_CAP = 8;
 
 /** AI 的升級加成選擇：冒險者已滿就加冒險者格，否則加任務暫存格。 */
 export function botUpgradeBonus(state: GameState, lib: CardLibrary, p: PlayerState): UpgradeBonus {
-  return capacityUsed(state, lib, p) >= adventurerCapacity(p) ? "adventurer" : "staging";
+  const full = capacityUsed(state, lib, p) >= adventurerCapacity(p);
+  if ((state.config.upgradeVariant ?? RULES.upgradeVariant) === "specialize") return full ? "adventurer" : "task";
+  return full ? "adventurer" : "staging";
 }
 
 export function botAction(state: GameState, lib: CardLibrary): Action {
@@ -182,7 +184,9 @@ export function botAction(state: GameState, lib: CardLibrary): Action {
       if (p.adventurers.length < 2 && recruitIndex >= 0 && (p.staging.length >= stagingSlots(p) || p.actionsLeft > 1)) {
         return { type: "recruit", tavernIndex: recruitIndex };
       }
-      if (p.staging.length < stagingSlots(p)) {
+      // paid 方案：額外的暫存格要付費，留一點錢付薪資
+      const stagingFee = p.upgradePerks?.paidExtra && p.staging.length >= RULES.stagingSlots.base ? p.upgradePerks.paidExtra : 0;
+      if (p.staging.length < stagingSlots(p) && p.gold >= stagingFee + (stagingFee ? 2 : 0)) {
         const dice = p.adventurers.reduce((s, uid) => s + unitBaseDice(state, lib, uid), 0);
         let best = -1;
         let bestScore = 0;
@@ -198,7 +202,9 @@ export function botAction(state: GameState, lib: CardLibrary): Action {
         if (best >= 0) return { type: "acceptTask", boardIndex: best };
         if ((state.config.taskSupply ?? RULES.taskSupply) === "deckTop" && state.taskDeck.length) return { type: "acceptTask", fromDeck: true };
       }
-      if (recruitIndex >= 0 && capacityUsed(state, lib, p) < adventurerCapacity(p)) return { type: "recruit", tavernIndex: recruitIndex };
+      const used = capacityUsed(state, lib, p);
+      const slotFee = p.upgradePerks?.paidExtra && !p.paidAdventurerSlot && used >= RULES.adventurerCapacity ? p.upgradePerks.paidExtra : 0;
+      if (recruitIndex >= 0 && used < adventurerCapacity(p) && p.gold >= slotFee + (slotFee ? 2 : 0)) return { type: "recruit", tavernIndex: recruitIndex };
       // 冒險者已滿：酒館有明顯更好的冒險者時，解僱最弱的一名來換
       if (recruitIndex >= 0) {
         const candidate = value(state, lib, state.tavern[recruitIndex]!);
