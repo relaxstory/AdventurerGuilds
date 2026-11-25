@@ -118,6 +118,8 @@ export function validate(data: CardData): Issue[] {
   ];
   const statusOf = (kind: CardKind, name: string) =>
     (data[kind] as readonly { name: string; status: string }[]).find((c) => c.name === name)?.status ?? "";
+  // 預留標籤：只有在沒有任何任務使用時才提醒
+  const activeTaskTags = new Set(data.tasks.filter((t) => active(t.status)).flatMap((t) => t.tags));
   for (const [kind, name, text, ownSkills] of texts) {
     if (!active(statusOf(kind, name))) continue;
     for (const tag of parseTagRefs(text)) {
@@ -126,7 +128,7 @@ export function validate(data: CardData): Issue[] {
         continue;
       }
       if (!known.has(tag)) add("warning", kind, name, `引用的標籤 ${tag} 沒有出現在任何冒險者特質、任務標籤或道具分類中`);
-      else if (RESERVED_TAGS.includes(tag)) add("warning", kind, name, `引用預留標籤 ${tag}，目前沒有任務帶這個標籤，能力暫時不會觸發`);
+      else if (RESERVED_TAGS.includes(tag) && !activeTaskTags.has(tag)) add("warning", kind, name, `引用預留標籤 ${tag}，目前沒有任務帶這個標籤，能力暫時不會觸發`);
     }
     for (const ref of text.match(/【[^】]+】/g) ?? []) {
       if (ownSkills.includes(ref) || KEYWORDS.includes(ref)) continue;

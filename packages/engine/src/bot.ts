@@ -3,7 +3,7 @@
  * 策略刻意保持單純，不代表最佳玩法。
  */
 import { RULES } from "./constants.js";
-import { adjustOptions, canBeFired, capacityUsed, clauses, clausesOf, has, members, permanentUsed, dispatchLimitProblem, squadKeyword, unitBaseDice, mustDispatch, outcome, participants, participationProblem, salaryFor } from "./abilities.js";
+import { adjustOptions, canBeFired, capacityUsed, clauses, clausesOf, faceOf, has, members, permanentRepeatProblem, permanentUsed, taskRequirementProblem, dispatchLimitProblem, squadKeyword, unitBaseDice, mustDispatch, outcome, participants, participationProblem, salaryFor } from "./abilities.js";
 import { activatedSkills, activationImplemented } from "./activate.js";
 import { itemDef, itemSlots, sellPrice, usedItemSlots } from "./items.js";
 import { turnOptions } from "./dice.js";
@@ -85,6 +85,23 @@ function chooseParty(state: GameState, lib: CardLibrary, taskUid: string): strin
   }
 
   if (p.missionsThisTurn === 0) for (const must of mustDispatch(state, lib, p)) if (!party.includes(must)) party.push(must);
+  // 任務的派遣條件（alpha1.3）：必須派遣的特質、人數下限；超過人數上限就放棄
+  const spare = () => upright.filter((u) => !party.includes(u)).sort((a, b) => dice(b) - dice(a));
+  for (const c of lib.clauses(def)) {
+    if (c.code === "TASK_REQUIRE_TRAIT" && !party.some((u) => members(state, u).some((m) => faceOf(state, lib, m).traits.some((t) => t === c.x)))) {
+      const withTrait = spare().find((u) => members(state, u).some((m) => faceOf(state, lib, m).traits.some((t) => t === c.x)));
+      if (!withTrait) return null;
+      party.push(withTrait);
+    }
+    if (c.code === "TASK_MIN_PARTICIPANTS") {
+      while (party.length < Number(c.x)) {
+        const next = spare()[0];
+        if (!next) return null;
+        party.push(next);
+      }
+    }
+  }
+  if (taskRequirementProblem(state, lib, taskUid, party) || permanentRepeatProblem(state, lib, taskUid, party)) return null;
   if (participationProblem(state, lib, party) || dispatchLimitProblem(state, lib, party)) return null;
   const salary = salaryFor(state, lib, party).total;
   if (salary > p.gold) return null;

@@ -55,6 +55,8 @@ function expectedSkills(data: CardData): { id: string; name: string; skill: stri
   }
   for (const c of data.tasks) {
     if (active(c.status) && (c.specialRule && c.specialRule.toUpperCase() !== "N/A")) out.push({ id: c.id, name: c.name, skill: "特殊規則", kind: "tasks" });
+    // 額外獎勵「獲得【道具】」需要 TASK_REWARD_ITEM 子句（史詩任務的榮譽卡獎勵另外處理）
+    if (active(c.status) && /^獲得【.+】$/.test(c.extraReward ?? "")) out.push({ id: c.id, name: c.name, skill: "額外獎勵", kind: "tasks" });
   }
   return out;
 }
