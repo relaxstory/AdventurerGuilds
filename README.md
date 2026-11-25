@@ -13,6 +13,7 @@
 | [任務設計紀錄](docs/tasks.md) | 任務難度參考、任務數值建議 |
 | [卡片能力](docs/abilities.md) | 技能模板清單、能力實作進度（程式產生） |
 | [模擬紀錄](docs/simulations.md) | AI 模擬報告、給其他 AI 助理的諮詢文件 |
+| [任務卡撰寫說明](docs/task-card-brief.md) | 給其他 AI 助理產出新任務卡的說明 |
 
 ## 開發
 
