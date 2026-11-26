@@ -77,3 +77,65 @@ describe("丹妮絲與迪倫（alpha1.3 之後新增）", () => {
     expect(currentPlayer(s).reputation).toBe(rep); // 任務聲望 0，阿絲特拉沒有觸發
   });
 });
+
+describe("奧【恢復術】（alpha1.4）", () => {
+  const destroy = async () => (await import("../src/lifecycle.js")).destroyAdventurer;
+
+  it("自己公會：丹妮絲要銷毀其他參與者時，奧可以使其無效，目標先橫置再重置（最後是直立）", () => {
+    const state = game();
+    const [denise, leon, o] = hire(state, "STD-C62", "STD-C21", "STD-C64");
+    const t = take(state, "STD-M21");
+    let s = run(state, lib, { type: "dispatch", task: t, adventurers: [denise!, leon!] });
+    s = run(s, lib, { type: "decide", decision: { option: "destroy", target: leon! } });
+    expect(s.pending).toMatchObject({ kind: "confirmRescue", rescuer: o, target: leon });
+    s = run(s, lib, { type: "decide", decision: { option: "yes" } });
+    expect(currentPlayer(s).adventurers).toContain(leon);
+    expect(s.adventurerCards[o!]!.tapped).toBe(true);
+    expect(s.adventurerCards[leon!]!.tapped).toBe(false);
+  });
+
+  it("其他公會：奧的擁有者使對手冒險者的銷毀無效，目標橫置，奧的擁有者提升 2 聲望", () => {
+    const state = game();
+    const [denise, leon] = hire(state, "STD-C62", "STD-C21");
+    const other = state.players.find((p) => p.id !== currentPlayer(state).id)!;
+    const o = `d${next++}`;
+    state.adventurerCards[o] = { uid: o, defId: "STD-C64", face: "front", tapped: false, tokens: {} };
+    other.adventurers.push(o);
+    const rep = other.reputation;
+    const t = take(state, "STD-M21");
+    let s = run(state, lib, { type: "dispatch", task: t, adventurers: [denise!, leon!] });
+    s = run(s, lib, { type: "decide", decision: { option: "destroy", target: leon! } });
+    expect(s.pending).toMatchObject({ kind: "confirmRescue", player: other.id });
+    s = run(s, lib, { type: "decide", decision: { option: "yes" } });
+    expect(currentPlayer(s).adventurers).toContain(leon);
+    expect(s.adventurerCards[leon!]!.tapped).toBe(true);
+    expect(s.players.find((p) => p.id === other.id)!.reputation).toBe(rep + 2);
+  });
+
+  it("不使用時照常銷毀；冒險者自身效果造成的銷毀不能使用恢復術；迪倫不會詢問", async () => {
+    const destroyAdventurer = await destroy();
+    const state = game();
+    const [leon, o, dylan, fan] = hire(state, "STD-C21", "STD-C64", "STD-C63", "STD-C21");
+    destroyAdventurer(state, lib, leon!, () => {}, true, "某張卡");
+    expect(state.pending).toMatchObject({ kind: "confirmRescue", rescuer: o });
+    const s = run(state, lib, { type: "decide", decision: { option: "no" } });
+    expect(currentPlayer(s).adventurers).not.toContain(leon);
+    destroyAdventurer(s, lib, fan!, () => {}, false, fan); // 自身效果
+    expect(s.pending).toBeNull();
+    expect(currentPlayer(s).adventurers).not.toContain(fan);
+    destroyAdventurer(s, lib, dylan!, () => {}, true, "某張卡");
+    expect(s.pending).toBeNull();
+    expect(currentPlayer(s).adventurers).toContain(dylan);
+  });
+
+  it("瓦雷諾的替代先詢問：轉移給瓦雷諾後，再詢問奧要不要救瓦雷諾", async () => {
+    const destroyAdventurer = await destroy();
+    const state = game();
+    const [leon, valeno] = hire(state, "STD-C21", "STD-C20");
+    hire(state, "STD-C64");
+    destroyAdventurer(state, lib, leon!, () => {}, true, "某張卡");
+    expect(state.pending).toMatchObject({ kind: "confirmReplace", target: leon, replacement: valeno });
+    const s = run(state, lib, { type: "decide", decision: { option: "yes" } });
+    expect(s.pending).toMatchObject({ kind: "confirmRescue", target: valeno });
+  });
+});

@@ -406,6 +406,22 @@ export function PendingPanel({ state, lib, act }: { state: GameState; lib: CardL
         </>
       );
       break;
+    case "confirmRescue": {
+      const targetOwner = ab.ownerOf(state, pending.target);
+      body = (
+        <>
+          <p>
+            {targetOwner?.name ?? ""} 的 {ab.faceOf(state, lib, pending.target).name} 將被銷毀。要橫置 {ab.faceOf(state, lib, pending.rescuer).name} 使用【恢復術】，使這次銷毀無效嗎？
+            {targetOwner?.id === pending.player ? "（自己公會：之後會重置該冒險者）" : "（其他公會：你提升 2 聲望）"}
+          </p>
+          <div className="row">
+            <button onClick={() => decide({ option: "yes" })}>使用恢復術</button>
+            <button onClick={() => decide({ option: "no" })}>不使用</button>
+          </div>
+        </>
+      );
+      break;
+    }
     case "confirmReplace":
       body = (
         <>

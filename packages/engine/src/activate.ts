@@ -7,7 +7,7 @@ import type { CardLibrary, ClauseDef } from "./defs.js";
 import { RuleError } from "./errors.js";
 import type { Rng } from "./rng.js";
 import { consumeCategory, countCategory, discardItem, gainItem, itemSlots, removeItem, slottedItems, splitList, usedItemSlots } from "./items.js";
-import { createDerivative, destroyAdventurer, destroyItem, finalizeDestroy } from "./lifecycle.js";
+import { createDerivative, destroyAdventurer, destroyItem, finalizeDestroy, rescueOrDestroy } from "./lifecycle.js";
 import type { GameState, PlayerState } from "./state.js";
 
 /** 發動主動能力時提供的參數，依效果而定。 */
@@ -363,7 +363,7 @@ function planEffects(
           const n = src.tokens[c.x] ?? 0;
           delete src.tokens[c.x];
           if (n) ab.addTokens(state, lib, t!, c.x, n, log, rng);
-          destroyAdventurer(state, lib, a.card, log, false);
+          destroyAdventurer(state, lib, a.card, log, false, a.card); // 自身效果造成的銷毀
         });
         break;
       }
@@ -517,7 +517,7 @@ function resolveDecision(
     }
     case "destroyOwn": {
       if (d.option !== "destroy" || !pending.candidates.includes(d.target)) throw new RuleError("請選擇自己公會中的一名冒險者");
-      destroyAdventurer(state, lib, d.target, say);
+      destroyAdventurer(state, lib, d.target, say, true, pending.source);
       if (state.itemCards[pending.source]) destroyItem(state, lib, who, pending.source, say);
       break;
     }
@@ -526,11 +526,35 @@ function resolveDecision(
       const use = d.option === "yes";
       if (pending.what === "adventurer") {
         if (use) say(`${ab.faceOf(state, lib, pending.replacement).name} 改為被銷毀`);
-        finalizeDestroy(state, lib, use ? pending.replacement : pending.target, say);
+        // 替代之後（或不替代）再詢問奧的【恢復術】，因為目標可能不同
+        rescueOrDestroy(state, lib, use ? pending.replacement : pending.target, say, pending.source);
       } else {
         const name = state.itemCards[use ? pending.replacement : pending.target]!.name;
         removeItem(state, who, use ? pending.replacement : pending.target);
         say(use ? `改為銷毀【${name}】` : `【${name}】被銷毀`);
+      }
+      break;
+    }
+    case "confirmRescue": {
+      if (d.option !== "yes" && d.option !== "no") throw new RuleError("請選擇是否使用【恢復術】");
+      const target = state.adventurerCards[pending.target];
+      const rescuer = state.adventurerCards[pending.rescuer];
+      if (d.option === "no" || !target || !rescuer || rescuer.tapped) {
+        rescueOrDestroy(state, lib, pending.target, say, pending.source, [...pending.declined, pending.rescuer]);
+        break;
+      }
+      // 橫置奧，使銷毀無效，並橫置目標；【維塔莉黛特的恩賜】：自己公會的目標重置，其他公會的目標提升聲望
+      rescuer.tapped = true;
+      target.tapped = true;
+      const rescuerName = ab.faceOf(state, lib, pending.rescuer).name;
+      const targetName = ab.faceOf(state, lib, pending.target).name;
+      say(`${rescuerName}【恢復術】：${targetName} 的銷毀無效，並橫置 ${targetName}`);
+      const own = ab.ownerOf(state, pending.target)?.id === who.id;
+      for (const c of ab.clauses(state, lib, pending.rescuer, "RESCUE_BONUS")) {
+        if (own) {
+          target.tapped = false;
+          say(`${rescuerName}【維塔莉黛特的恩賜】：重置 ${targetName}`);
+        } else ab.gain(who, ab.amount(state, lib, pending.rescuer, c.x), c.y, say, `${rescuerName}【維塔莉黛特的恩賜】`);
       }
       break;
     }

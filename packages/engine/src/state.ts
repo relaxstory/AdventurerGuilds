@@ -203,6 +203,17 @@ export type Pending =
       readonly target: string;
       /** 改為銷毀的冒險者（瓦雷諾）或道具（戈拉古斯的手稿）。 */
       readonly replacement: string;
+      /** 造成銷毀的卡片（判斷是不是冒險者自身的效果）。 */
+      readonly source?: string;
+    }
+  /** 奧【恢復術】：是否橫置 rescuer，使 target 的這次銷毀無效。declined 為已經選擇不使用的冒險者。 */
+  | {
+      readonly kind: "confirmRescue";
+      readonly player: string;
+      readonly rescuer: string;
+      readonly target: string;
+      readonly source?: string;
+      readonly declined: readonly string[];
     };
 
 export interface LogEntry {

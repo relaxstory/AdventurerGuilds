@@ -166,6 +166,7 @@ function botDecision(state: GameState, lib: CardLibrary): Action {
     return { type: "decide", decision: { option: "fire", target: weakest } };
   }
   if (pending.kind === "extendTask") return { type: "decide", decision: { option: "task", target: pending.candidates[0]! } };
+  if (pending.kind === "confirmRescue") return { type: "decide", decision: { option: "yes" } };
   if (pending.kind === "confirmReplace") return { type: "decide", decision: { option: pending.what === "adventurer" ? "yes" : "no" } };
   if (pending.kind === "destroyOwn") {
     // 優先選銷毀無效的冒險者（迪倫），其次衍生物，再來是價值最低的

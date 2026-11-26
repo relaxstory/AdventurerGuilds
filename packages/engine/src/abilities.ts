@@ -17,7 +17,7 @@ import type { GameState, Mission, Pending, PlayerState } from "./state.js";
 export const IMPLEMENTED = new Set([
   "COND_HAS_CARDS",
   "NO_ROUND_RESET", "NO_TAP_FIRST_DISPATCH", "NO_TAP_DISPATCH", "DISPATCH_ADD_TOKEN_NO_TAP", "REPEAT_PERMANENT_TASK",
-  "PARTICIPATE_AUTO_COMPLETE", "AFTER_MISSION_DESTROY_PARTICIPANT", "PREVENT_OWN_DESTRUCTION",
+  "PARTICIPATE_AUTO_COMPLETE", "AFTER_MISSION_DESTROY_PARTICIPANT", "PREVENT_OWN_DESTRUCTION", "REACT_PREVENT_DESTROY", "RESCUE_BONUS",
   "DICE_PER_TOKEN", "TOKEN_THRESHOLD_FLIP", "DISPATCH_LIMIT_PER_TURN", "CANNOT_BE_FIRED", "NOT_COUNT_CAPACITY",
   "CANNOT_PARTICIPATE_WITH", "COUNTS_AS_RACE", "ANY_PROFESSION", "FREE_RECRUIT_IF_NAME", "MUST_PARTICIPATE_FIRST",
   "TASK_DIFFICULTY", "WITH_CARD_DIFFICULTY", "WITH_PROFESSION_DICE", "WITH_CARD_DICE", "TASK_BASE_DICE",
@@ -64,7 +64,7 @@ export function passesGuard(state: GameState, lib: CardLibrary, rng: Rng, actor:
   const limit = amount(state, lib, guard, clauses(state, lib, guard, "GUARD_REDIRECT")[0]!.x);
   const roll = rng.d6();
   log(`${faceOf(state, lib, guard).name}【不可以過！】：改為指定它，擲出 ${roll}${roll <= limit ? `，未大於 ${limit}，取消該次能力` : `，大於 ${limit}，能力打在守門員小嗶身上`}`);
-  destroyAdventurer(state, lib, guard, log, false);
+  destroyAdventurer(state, lib, guard, log, false, guard); // 守門員小嗶自身效果造成的銷毀
   return false;
 }
 
