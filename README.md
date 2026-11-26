@@ -15,6 +15,7 @@
 | [模擬紀錄](docs/simulations.md) | AI 模擬報告、給其他 AI 助理的諮詢文件 |
 | [任務卡撰寫說明](docs/task-card-brief.md) | 給其他 AI 助理產出新任務卡的說明 |
 | [冒險者文字修改清單](docs/adventurer-text-changes.md) | 給其他 AI 助理修改試算表的清單 |
+| [任務流程文字修改清單](docs/flow-text-changes.md) | 依新任務流程調整卡片文字的清單（給其他 AI 助理） |
 
 ## 開發
 
