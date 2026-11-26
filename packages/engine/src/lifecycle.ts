@@ -67,11 +67,11 @@ export function destroyAdventurer(state: GameState, lib: CardLibrary, uid: strin
 }
 
 /**
- * 奧【恢復術】：其他冒險者將被銷毀時（代價與主動犧牲除外），可以橫置奧使該次銷毀無效。
+ * 奧【恢復術】：其他非衍生物冒險者將被銷毀時（代價與主動犧牲除外），可以橫置奧，改為橫置該冒險者。
  * 依序詢問每一名直立的奧（declined 為已經不使用的）；都不使用就銷毀。
  */
 export function rescueOrDestroy(state: GameState, lib: CardLibrary, uid: string, log: Log, source?: string, declined: readonly string[] = []): void {
-  {
+  if (!state.adventurerCards[uid]?.derivative) {
     for (const p of state.players) {
       const rescuer = p.adventurers.find(
         (u) => u !== uid && !declined.includes(u) && !state.adventurerCards[u]!.tapped && ab.has(state, lib, u, "REACT_PREVENT_DESTROY"),

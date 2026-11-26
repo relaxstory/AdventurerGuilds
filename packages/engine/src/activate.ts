@@ -548,7 +548,7 @@ function resolveDecision(
       target.tapped = true;
       const rescuerName = ab.faceOf(state, lib, pending.rescuer).name;
       const targetName = ab.faceOf(state, lib, pending.target).name;
-      say(`${rescuerName}【恢復術】：${targetName} 的銷毀無效，並橫置 ${targetName}`);
+      say(`${rescuerName}【恢復術】：${targetName} 改為被橫置（不被銷毀）`);
       const own = ab.ownerOf(state, pending.target)?.id === who.id;
       for (const c of ab.clauses(state, lib, pending.rescuer, "RESCUE_BONUS")) {
         if (own) {

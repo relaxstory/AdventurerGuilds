@@ -124,9 +124,16 @@ describe("奧【恢復術】（alpha1.4）", () => {
     expect(s.pending).toBeNull();
     expect(currentPlayer(s).adventurers).not.toContain(fan);
     const [selfHarm] = hire(s, "STD-C21");
-    destroyAdventurer(s, lib, selfHarm!, () => {}, false, selfHarm); // 負面效果：可以救
+    destroyAdventurer(s, lib, selfHarm!, () => {}, false, selfHarm); // 負面效果：可以改為橫置
     expect(s.pending).toMatchObject({ kind: "confirmRescue", target: selfHarm });
     s.pending = null;
+    // 衍生物不是恢復術的對象
+    const beep = `d${next++}`;
+    s.adventurerCards[beep] = { uid: beep, defId: "STD-T01", face: "front", tapped: false, tokens: {}, derivative: true };
+    currentPlayer(s).adventurers.push(beep);
+    destroyAdventurer(s, lib, beep, () => {}, true, "某張卡");
+    expect(s.pending).toBeNull();
+    expect(currentPlayer(s).adventurers).not.toContain(beep);
     destroyAdventurer(s, lib, dylan!, () => {}, true, "某張卡");
     expect(s.pending).toBeNull();
     expect(currentPlayer(s).adventurers).toContain(dylan);
