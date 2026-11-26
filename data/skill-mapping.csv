@@ -34,7 +34,7 @@ STD-C11B,那個賴皮的勇者,2,【就是不走】,1,CANNOT_BE_FIRED,,,,
 STD-C12,「打手」布魯斯與威利,1,【布魯斯！】,1,COST,橫置此冒險者,2,,
 STD-C12,「打手」布魯斯與威利,1,【布魯斯！】,2,EFF_OPPONENT_TAP_OR_PAY,3,,,
 STD-C12,「打手」布魯斯與威利,2,【威利！】,1,REDIRECT_TARGETING,,,,
-STD-C13,「飛毛腿」萊利,1,【借過借過借過~~】,1,COMPLETE_GAIN,緊急,1,金幣,
+STD-C13,「飛毛腿」萊利,1,【借過借過借過～～】,1,COMPLETE_GAIN,緊急,1,金幣,
 STD-C14,「火焰」伊格納斯,1,【完美火候】,1,COMPLETE_GAIN,[巧手],1,金幣,
 STD-C15,暗影,1,【充分準備】,1,NO_TAP_FIRST_DISPATCH,,,,
 STD-C15,暗影,2,【狡兔三窟】,1,UNTARGETABLE_BY_TRAIT,[王國],,,
@@ -59,7 +59,7 @@ STD-C23,老約翰,2,【森林瑰寶】,1,COMPLETE_GAIN_ITEM,[森林],鹿腿肉�
 STD-C24,衛兵 查理,1,【例行公事】,1,TASK_DIFFICULTY,永久,1,,
 STD-C25,衛兵 呂昶,1,【追捕默契】,1,WITH_CARD_DIFFICULTY,衛兵 凱蒂,1,,
 STD-C26,衛兵 凱蒂,1,【追捕默契】,1,WITH_CARD_DIFFICULTY,衛兵 呂昶,1,,
-STD-C27,伊蓮娜．蕨葉,1,【加一點這個，然後是這個……】,1,TIMING,公會階段,,,「銷毀兩個藥材」視為代價
+STD-C27,伊蓮娜．蕨葉,1,【加一點這個，然後是這個……】,1,TIMING,公會階段,,,「消耗2個[藥材]」為代價
 STD-C27,伊蓮娜．蕨葉,1,【加一點這個，然後是這個……】,2,COST,,,2 [藥材],
 STD-C27,伊蓮娜．蕨葉,1,【加一點這個，然後是這個……】,3,EFF_GAIN_ITEM_CHOICE,伊蓮娜的強壯藥劑／伊蓮娜的縮小藥劑／伊蓮娜的精力藥劑,,,
 STD-C28,馬克,1,【善心助人】,1,PARTICIPATE_GAIN,1,聲望,,
