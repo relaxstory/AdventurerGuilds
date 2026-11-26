@@ -1,6 +1,6 @@
 import { createContext, useContext, type ReactNode } from "react";
 import { abilities as ab, type CardLibrary, type GameState } from "../../../engine/src/index.js";
-import { adventurerText, itemText, taskText } from "../data.js";
+import { adventurerText, itemText, taskText, stripBackMark } from "../data.js";
 
 /** 點選卡片時放大顯示：kind 為卡片種類，uid 為卡片。 */
 export type Inspected = { readonly kind: "adventurer" | "task" | "item"; readonly uid: string };
@@ -74,7 +74,7 @@ export function AdventurerCard({
         {card.tapped && <span className="badge">橫置</span>}
         {card.derivative && <span className="badge alt">衍生物</span>}
       </div>
-      <div className="card-type">{[face.race, face.profession].filter(Boolean).join("．")}</div>
+      <div className="card-type">{[face.race, face.profession].filter(Boolean).map(stripBackMark).join("．")}</div>
       {face.traits.length > 0 && <div className="card-type traits">{face.traits.join("")}</div>}
       <div className="card-stats">
         <span title="基礎骰數">🎲 {dice}</span>
