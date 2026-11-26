@@ -363,7 +363,7 @@ function planEffects(
           const n = src.tokens[c.x] ?? 0;
           delete src.tokens[c.x];
           if (n) ab.addTokens(state, lib, t!, c.x, n, log, rng);
-          destroyAdventurer(state, lib, a.card, log, false, a.card); // 自身效果造成的銷毀
+          destroyAdventurer(state, lib, a.card, log, false, a.card, true); // 狗狗小嗶：主動犧牲，不能被恢復術無效
         });
         break;
       }

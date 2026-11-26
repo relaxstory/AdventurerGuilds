@@ -37,10 +37,10 @@ export function workshopOptions(lib: CardLibrary, series: string): string[] {
  * 瓦雷諾【你們走，我留下。】這類「你可以改為銷毀」的替代效果，會先詢問擁有者。
  */
 /**
- * 銷毀冒險者。source 為造成銷毀的卡片（冒險者自身的效果時就是 uid 本身）。
+ * 銷毀冒險者。source 為造成銷毀的卡片；sacrifice 為 true 表示代價或主動犧牲（不能被阻止或規避，docs/spec.md 16 G17）。
  * 處理順序（docs/spec.md 13A.6）：迪倫的【不死之身】直接生效 → 瓦雷諾的替代 → 奧的【恢復術】 → 銷毀。
  */
-export function destroyAdventurer(state: GameState, lib: CardLibrary, uid: string, log: Log, allowReplace = true, source?: string): void {
+export function destroyAdventurer(state: GameState, lib: CardLibrary, uid: string, log: Log, allowReplace = true, source?: string, sacrifice = false): void {
   const owner = ab.ownerOf(state, uid);
   const card = state.adventurerCards[uid];
   if (!owner || !card) return;
@@ -59,15 +59,19 @@ export function destroyAdventurer(state: GameState, lib: CardLibrary, uid: strin
       return;
     }
   }
+  if (sacrifice) {
+    finalizeDestroy(state, lib, uid, log); // 代價與主動犧牲：不能被恢復術無效
+    return;
+  }
   rescueOrDestroy(state, lib, uid, log, source);
 }
 
 /**
- * 奧【恢復術】：其他冒險者被「非該冒險者自身的效果」銷毀時，可以橫置奧使該次銷毀無效。
+ * 奧【恢復術】：其他冒險者將被銷毀時（代價與主動犧牲除外），可以橫置奧使該次銷毀無效。
  * 依序詢問每一名直立的奧（declined 為已經不使用的）；都不使用就銷毀。
  */
 export function rescueOrDestroy(state: GameState, lib: CardLibrary, uid: string, log: Log, source?: string, declined: readonly string[] = []): void {
-  if (source !== uid) {
+  {
     for (const p of state.players) {
       const rescuer = p.adventurers.find(
         (u) => u !== uid && !declined.includes(u) && !state.adventurerCards[u]!.tapped && ab.has(state, lib, u, "REACT_PREVENT_DESTROY"),
@@ -190,7 +194,7 @@ export function afterSettle(state: GameState, lib: CardLibrary, p: PlayerState, 
   for (const uid of party) {
     if (!state.adventurerCards[uid]) continue;
     for (const c of ab.clauses(state, lib, uid, "WITH_CARD_DESTROY_AFTER")) {
-      if (names.includes(c.x.replace(/[\s「」]/g, ""))) destroyAdventurer(state, lib, uid, log, false, uid); // 自身效果
+      if (names.includes(c.x.replace(/[\s「」]/g, ""))) destroyAdventurer(state, lib, uid, log, false, uid); // 負面效果：可以被恢復術無效
     }
   }
 }
@@ -201,7 +205,7 @@ export function afterSettle(state: GameState, lib: CardLibrary, p: PlayerState, 
 export function roundEndDestroy(state: GameState, lib: CardLibrary, log: (player: string, text: string) => void): void {
   for (const p of state.players) {
     for (const uid of [...p.adventurers]) {
-      if (ab.has(state, lib, uid, "ROUNDEND_DESTROY_SELF")) destroyAdventurer(state, lib, uid, (t) => log(p.id, t), false, uid); // 自身效果
+      if (ab.has(state, lib, uid, "ROUNDEND_DESTROY_SELF")) destroyAdventurer(state, lib, uid, (t) => log(p.id, t), false, uid); // 負面效果：可以被恢復術無效
     }
   }
 }

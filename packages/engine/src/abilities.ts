@@ -64,7 +64,7 @@ export function passesGuard(state: GameState, lib: CardLibrary, rng: Rng, actor:
   const limit = amount(state, lib, guard, clauses(state, lib, guard, "GUARD_REDIRECT")[0]!.x);
   const roll = rng.d6();
   log(`${faceOf(state, lib, guard).name}【不可以過！】：改為指定它，擲出 ${roll}${roll <= limit ? `，未大於 ${limit}，取消該次能力` : `，大於 ${limit}，能力打在守門員小嗶身上`}`);
-  destroyAdventurer(state, lib, guard, log, false, guard); // 守門員小嗶自身效果造成的銷毀
+  destroyAdventurer(state, lib, guard, log, false, guard, true); // 守門員小嗶：玩家主動選擇的犧牲，不能被恢復術無效
   return false;
 }
 

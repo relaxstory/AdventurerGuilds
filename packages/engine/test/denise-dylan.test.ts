@@ -112,7 +112,7 @@ describe("奧【恢復術】（alpha1.4）", () => {
     expect(s.players.find((p) => p.id === other.id)!.reputation).toBe(rep + 2);
   });
 
-  it("不使用時照常銷毀；冒險者自身效果造成的銷毀不能使用恢復術；迪倫不會詢問", async () => {
+  it("不使用時照常銷毀；代價與主動犧牲不能使用恢復術，負面效果可以；迪倫不會詢問", async () => {
     const destroyAdventurer = await destroy();
     const state = game();
     const [leon, o, dylan, fan] = hire(state, "STD-C21", "STD-C64", "STD-C63", "STD-C21");
@@ -120,9 +120,13 @@ describe("奧【恢復術】（alpha1.4）", () => {
     expect(state.pending).toMatchObject({ kind: "confirmRescue", rescuer: o });
     const s = run(state, lib, { type: "decide", decision: { option: "no" } });
     expect(currentPlayer(s).adventurers).not.toContain(leon);
-    destroyAdventurer(s, lib, fan!, () => {}, false, fan); // 自身效果
+    destroyAdventurer(s, lib, fan!, () => {}, false, fan, true); // 代價或主動犧牲（G17）
     expect(s.pending).toBeNull();
     expect(currentPlayer(s).adventurers).not.toContain(fan);
+    const [selfHarm] = hire(s, "STD-C21");
+    destroyAdventurer(s, lib, selfHarm!, () => {}, false, selfHarm); // 負面效果：可以救
+    expect(s.pending).toMatchObject({ kind: "confirmRescue", target: selfHarm });
+    s.pending = null;
     destroyAdventurer(s, lib, dylan!, () => {}, true, "某張卡");
     expect(s.pending).toBeNull();
     expect(currentPlayer(s).adventurers).toContain(dylan);
