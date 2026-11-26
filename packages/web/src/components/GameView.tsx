@@ -378,6 +378,8 @@ function ItemUse({ state, lib, uid, act, onUseItem }: { state: GameState; lib: C
   const codes = it.itemClauses(state, lib, uid).map((c) => c.code);
   if (!codes.includes("ITEM_CONSUME") && !codes.includes("CONSUME_ALL_TIER_GAIN")) return null;
   // 寫明任務流程時機的道具在該窗口使用；希氏炸藥在擲骰後（在派遣面板中使用）；其餘在冒險階段、派遣流程以外
+  // 希氏炸藥：在派遣面板「確認任務結果前」使用（不在道具卡上重複顯示）
+  if (codes.includes("ITEM_TOKEN_TIER_RESULT")) return null;
   const timing = it.itemClauses(state, lib, uid).find((c) => c.code === "TIMING")?.x;
   if (timing && timing in ab.MISSION_WINDOWS) {
     if (state.phase !== "adventure" || state.mission?.stage !== ab.MISSION_WINDOWS[timing]) return null;

@@ -109,7 +109,7 @@ describe("製作與轉換", () => {
     expect(s.adventurerCards[jamie!]!.tokens).toEqual({});
     const t = take(s, "STD-M04");
     s = run(s, lib, { type: "dispatch", task: t, adventurers: [leon!] });
-    expect(() => run(s, lib, { type: "useItem", item: bomb })).toThrow("只能在擲骰後使用");
+    expect(() => run(s, lib, { type: "useItem", item: bomb })).toThrow("只能在「確認任務結果前」使用");
     s = run(s, lib, { type: "roll" }, { type: "useItem", item: bomb });
     expect(s.mission!.resultDelta).toBe(5); // 4～6 個指示物：骰子總和 +5
   });

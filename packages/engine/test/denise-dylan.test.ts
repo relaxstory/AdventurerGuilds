@@ -195,3 +195,29 @@ describe("時機窗口的實際判定", () => {
     expect(currentPlayer(s).reputation).toBe(rep + 1);
   });
 });
+
+describe("派遣人數與結果值（alpha1.4 確認事項）", () => {
+  it("人數限制以派遣人數判定：瑞斯教授加入的冒險者不計入（最多派遣 2 名的任務，加入第 3 名仍可以）", () => {
+    const state = game();
+    const [a, b, c, rhys] = hire(state, "STD-C21", "STD-C13", "STD-C04", "STD-C57");
+    const t = take(state, "STD-M24"); // 暗巷換貨：此任務最多派遣2名冒險者
+    expect(() => run(state, lib, { type: "dispatch", task: t, adventurers: [a!, b!, c!] })).toThrow("最多派遣 2 名");
+    let s = run(state, lib, { type: "dispatch", task: t, adventurers: [a!, b!] });
+    s = run(s, lib, { type: "activate", card: rhys!, skill: "【空間傳送】", targets: [c!] });
+    expect(s.mission!.joined).toEqual([c]);
+    expect(s.mission!.salary).toBe(currentPlayer(state).gold - currentPlayer(s).gold);
+    expect(s.adventurerCards[c!]!.tapped).toBe(false);
+  });
+
+  it("怪盜雞德的預言以最終結果值判定（不是骰面總和）", async () => {
+    const ab = await import("../src/abilities.js");
+    const state = game();
+    const [kid] = hire(state, "STD-C37");
+    const t = take(state, "STD-M21");
+    const p = currentPlayer(state);
+    const gold = p.gold;
+    const m = { task: t, dispatched: [kid!], joined: [], salary: 0, stage: "adjust" as const, dice: [2, 2], pool: 2, removedBy: {}, predictions: { [kid!]: "odd" as const }, baseDice: {}, used: {}, turned: {}, resultDelta: 1, resultTimes: 1, autoSuccess: false, gamble: null };
+    ab.onSettleChoices(state, lib, p, m, 5, true, () => {}); // 骰面總和 4（偶數），結果值 5（奇數）
+    expect(p.gold).toBe(gold + 3);
+  });
+});

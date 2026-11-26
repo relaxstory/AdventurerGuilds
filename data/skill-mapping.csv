@@ -135,6 +135,7 @@ STD-C55B,「過勞死」凱菲,1,【終於可以一直上班了！】,1,MUST_PAR
 STD-C55B,「過勞死」凱菲,2,【沒事得找事啊！】,1,TURNEND_IF_UPRIGHT_TAP_PAY,10,,,
 STD-C55B,「過勞死」凱菲,3,【我拒絕離職】,1,CANNOT_BE_FIRED,,,,
 STD-C56,格芮絲,1,【初級奧術飛彈】,1,WITH_PROFESSION_DICE,[巫師],1,,
+STD-C57,瑞斯教授,1,【空間傳送】,0,TIMING,建立骰池前,,,
 STD-C57,瑞斯教授,1,【空間傳送】,1,COST,橫置此冒險者,,,
 STD-C57,瑞斯教授,1,【空間傳送】,2,ADD_PARTICIPANT,1,,,
 STD-C58,阿骨,1,【我算一個人嗎？】,1,NOT_COUNT_CAPACITY,,,,
@@ -186,8 +187,9 @@ ITM-004,紅斑菌菇,1,功能,3,EFF_NO_RESET_ROUND,,,,
 ITM-007,父親的家書,1,功能,1,WHILE_HELD_NO_TAP_FIRST,芙蕾雅．霜語,,,
 （無編號）,《王座之側的荊棘玫瑰》,1,功能,1,WHILE_HELD_BLOCK_OPTION,里諾【你好，我可以逮捕你嗎？】,2,,尚未實裝，匯入時略過
 ITM-008,戈拉古斯的手稿,1,功能,1,REPLACE_DESTROY_UNIQUE_ITEM,,,,
+ITM-009,希氏炸藥,1,功能,0,TIMING,確認任務結果前,,,
 ITM-009,希氏炸藥,1,功能,1,ITEM_CONSUME,,,,
-ITM-009,希氏炸藥,1,功能,2,ITEM_TOKEN_TIER_RESULT,,,,
+ITM-009,希氏炸藥,1,功能,2,ITEM_TOKEN_TIER_RESULT,,,,結果值的調整與加倍
 ITM-010,梅里妲的注視,1,功能,1,ON_REP_DECREASE_DESTROY,,,,
 ITM-011,火爪的信念,1,功能,1,CONSUME_ALL_TIER_GAIN,,,,
 ITM-015,漢克的貨品,1,功能,1,SUBSTITUTE_ITEM,[農產品]／[乳製品],,,
