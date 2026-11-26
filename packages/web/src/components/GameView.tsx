@@ -465,7 +465,7 @@ function MissionPanel({
               </select>
             </label>
           ))}
-          {party.flatMap((u) => ab.clauses(state, lib, u, "BASE_DICE_CHOICE").map((c) => (
+          {m.dispatched.flatMap((u) => ab.clauses(state, lib, u, "BASE_DICE_CHOICE").map((c) => (
             <label key={u}>
               {ab.faceOf(state, lib, u).name} 的基礎骰數（{c.x}～{c.y}）：
               <input type="number" min={Number(c.x)} max={Number(c.y)} value={baseDice[u] ?? ""} onChange={(e) => setBaseDice({ ...baseDice, [u]: Number(e.target.value) })} />

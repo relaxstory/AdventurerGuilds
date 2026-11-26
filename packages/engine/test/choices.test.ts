@@ -32,6 +32,16 @@ describe("擲骰前的選擇", () => {
     expect(currentPlayer(out).gold).toBe(gold + 7 + 3); // 地磚 ≥9 成功 7 金，加上預言 3 金
   });
 
+  it("古斯：用「加入此次任務」加入時不是派遣，不能自選基礎骰數", () => {
+    const { state, lib } = adventure();
+    const [leon, goose, rhys] = hire(state, "STD-C21", "STD-C43", "STD-C57");
+    const t = take(state, "STD-M04");
+    let s = run(state, lib, { type: "dispatch", task: t, adventurers: [leon!] });
+    s = run(s, lib, { type: "activate", card: rhys!, skill: "【空間傳送】", targets: [goose!] });
+    expect(() => run(s, lib, { type: "roll", baseDice: { [goose!]: 0 } })).toThrow("不能自選基礎骰數");
+    expect(run(s, lib, { type: "roll" }).mission!.pool).toBe(1 + 4);
+  });
+
   it("古斯：基礎骰數可以視為 0～4 中的任意數字", () => {
     const { state, lib } = adventure();
     const [goose] = hire(state, "STD-C43");

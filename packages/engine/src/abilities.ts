@@ -474,7 +474,8 @@ export function dicePool(state: GameState, lib: CardLibrary, m: Mission, def: Ta
     if (roundDelta?.round === state.round) base += roundDelta.delta;
     for (const c of clauses(state, lib, uid, "TASK_BASE_DICE")) if (taskMatches(c.x, def, attempts)) base += amount(state, lib, uid, c.y);
     let dice = Math.max(0, base);
-    for (const c of clauses(state, lib, uid, "DICE_PER_TOKEN")) dice += amount(state, lib, uid, c.x) * amount(state, lib, uid, c.y);
+    // Z＝「派遣」：只有被派遣時適用（重拳小嗶「派遣此衍生物時」）；凱菲的疲勞骰數不限
+    for (const c of clauses(state, lib, uid, "DICE_PER_TOKEN")) if (c.z !== "派遣" || m.dispatched.includes(uid)) dice += amount(state, lib, uid, c.x) * amount(state, lib, uid, c.y);
     for (const c of clauses(state, lib, uid, "SQUAD_DICE")) dice += perSoldiers(state, lib, uid, c);
     for (const c of clauses(state, lib, uid, "WITH_CARD_DICE")) if (names.some((n) => sameName(n, c.x))) dice += amount(state, lib, uid, c.y);
     for (const c of clauses(state, lib, uid, "WITH_PROFESSION_DICE")) {
@@ -520,7 +521,8 @@ export function difficulty(state: GameState, lib: CardLibrary, m: Mission, def: 
   const attempts = state.taskCards[m.task]!.attempts;
   let n = attempts;
   for (const uid of party) {
-    for (const c of clauses(state, lib, uid, "TASK_DIFFICULTY")) if (taskMatches(c.x, def, attempts)) n += amount(state, lib, uid, c.y);
+    // Z＝「派遣」：只有被派遣時適用（偷偷摸摸小嗶「派遣此衍生物參與……時」）
+    for (const c of clauses(state, lib, uid, "TASK_DIFFICULTY")) if (taskMatches(c.x, def, attempts) && (c.z !== "派遣" || m.dispatched.includes(uid))) n += amount(state, lib, uid, c.y);
     for (const c of clauses(state, lib, uid, "WITH_CARD_DIFFICULTY")) if (names.some((x) => sameName(x, c.x))) n += amount(state, lib, uid, c.y);
     for (const c of clauses(state, lib, uid, "SQUAD_DIFFICULTY")) n += perSoldiers(state, lib, uid, c);
   }
@@ -655,7 +657,8 @@ export function applyRollChoices(state: GameState, lib: CardLibrary, m: Mission,
       if (p !== "odd" && p !== "even") throw new RuleError(`${name} 需要在擲骰前預言結果值為奇數或偶數`);
       m.predictions[uid] = p;
     }
-    const range = clauses(state, lib, uid, "BASE_DICE_CHOICE")[0];
+    // 金牙古斯【你跑不掉的】：「派遣此冒險者……時」，用「加入此次任務」加入時不能自選
+    const range = m.dispatched.includes(uid) ? clauses(state, lib, uid, "BASE_DICE_CHOICE")[0] : undefined;
     const chosen = choices.baseDice?.[uid];
     if (chosen !== undefined) {
       if (!range) throw new RuleError(`${name} 不能自選基礎骰數`);
@@ -726,7 +729,8 @@ export function adjustOptions(state: GameState, lib: CardLibrary, m: Mission): A
         out.push({ card: uid, kind: "gamble", remaining: Math.min(amount(state, lib, uid, c.y), m.dice.length), mandatory: false });
       }
     }
-    for (const c of clauses(state, lib, uid, "RESULT_ADJUST")) {
+    // 喀嘣小嗶「派遣此衍生物時」：只有被派遣時適用
+    for (const c of m.dispatched.includes(uid) ? clauses(state, lib, uid, "RESULT_ADJUST") : []) {
       if (!used(c.code)) out.push({ card: uid, kind: "adjustResult", remaining: amount(state, lib, uid, c.x), mandatory: false });
     }
     for (const c of clauses(state, lib, uid, "SQUAD_RESULT_ADJUST")) {

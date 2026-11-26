@@ -146,7 +146,7 @@ STD-C60,漢克．溫徹斯特,2,【農產加工】,2,EFF_CONVERT_ITEMS,2,[農產
 STD-C61,凱莉．溫徹斯特,1,【牧場鮮乳】,1,TURNEND_GAIN_ITEM,,1,牛乳,
 STD-C61,凱莉．溫徹斯特,2,【牧場好朋友】,1,AFTER_ROLL_TURN,[動物],1,,[動物] 為預留標籤
 STD-T01,重拳小嗶,1,【精工】,1,ON_CREATE_TRANSFER_TOKENS,「天才」瑪絲珂,精工,,
-STD-T01,重拳小嗶,2,【重拳出擊！】,1,DICE_PER_TOKEN,精工,1,,
+STD-T01,重拳小嗶,2,【重拳出擊！】,1,DICE_PER_TOKEN,精工,1,派遣,
 STD-T01,重拳小嗶,3,【臨時機體】,1,ROUNDEND_DESTROY_SELF,,,,
 STD-T02,飛天小嗶,1,【精工】,1,ON_CREATE_TRANSFER_TOKENS,「天才」瑪絲珂,精工,,
 STD-T02,飛天小嗶,2,【從天而降的掌法！】,1,COST,橫置此冒險者,,,
@@ -156,7 +156,7 @@ STD-T03,喀嘣小嗶,1,【精工】,1,ON_CREATE_TRANSFER_TOKENS,「天才」瑪�
 STD-T03,喀嘣小嗶,2,【BOOOOOOM！】,1,RESULT_ADJUST,精工,,,
 STD-T03,喀嘣小嗶,3,【臨時機體】,1,ROUNDEND_DESTROY_SELF,,,,
 STD-T04,偷偷摸摸小嗶,1,【精工】,1,ON_CREATE_TRANSFER_TOKENS,「天才」瑪絲珂,精工,,
-STD-T04,偷偷摸摸小嗶,2,【塗黑黑！】,1,TASK_DIFFICULTY,[潛行],精工/2,,
+STD-T04,偷偷摸摸小嗶,2,【塗黑黑！】,1,TASK_DIFFICULTY,[潛行],精工/2,派遣,
 STD-T04,偷偷摸摸小嗶,3,【臨時機體】,1,ROUNDEND_DESTROY_SELF,,,,
 STD-T05,守門員小嗶,1,【精工】,1,ON_CREATE_TRANSFER_TOKENS,「天才」瑪絲珂,精工,,
 STD-T05,守門員小嗶,2,【不可以過！】,1,GUARD_REDIRECT,精工,,,
