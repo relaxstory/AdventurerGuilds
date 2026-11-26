@@ -83,7 +83,8 @@ export function GameView({
     // 只派遣目前玩家公會中、仍然直立的冒險者（選取後可能被橫置、解僱或銷毀）
     const chosen = party.filter((u) => me.adventurers.includes(u) && !state.adventurerCards[u]?.tapped);
     const extra = must.filter((u) => !chosen.includes(u) && me.gold >= ab.salaryFor(state, lib, [...chosen, u]).total);
-    if (task && act({ type: "dispatch", task, adventurers: [...chosen, ...extra] })) {
+    // 2. 派遣步驟：出動之後，選擇冒險者並支付薪資
+    if (state.mission?.stage === "select" && act({ type: "dispatch", adventurers: [...chosen, ...extra] })) {
       setParty([]);
     }
   };
@@ -152,7 +153,18 @@ export function GameView({
             <p className="muted">冒險者牌庫剩 {state.adventurerDeck.length} 張</p>
           </section>
 
-          {state.mission && <MissionPanel state={state} lib={lib} act={act} onActivate={(card, skill) => setActivating({ card, skill })} onUseItem={setUsingItem} />}
+          {state.mission && (
+            <MissionPanel
+              state={state}
+              lib={lib}
+              act={act}
+              party={party}
+              must={must}
+              dispatch={dispatch}
+              onActivate={(card, skill) => setActivating({ card, skill })}
+              onUseItem={setUsingItem}
+            />
+          )}
 
           {[...state.players].sort((a, b) => Number(b.id === me.id) - Number(a.id === me.id)).map((p) => (
             <Guild
@@ -245,7 +257,9 @@ function Guild({
 }) {
   const phase = state.phase;
   const canAct = active && !blocked;
-  const picking = canAct && phase === "adventure" && !state.mission;
+  // 1. 選擇任務步驟：沒有進行中的任務時選任務；出動後才選擇要派遣的冒險者
+  const choosingTask = canAct && phase === "adventure" && !state.mission;
+  const picking = canAct && phase === "adventure" && state.mission?.stage === "select";
   const slots = it.itemSlots(state, lib, p);
   return (
     <section className={`guild${active ? " active" : ""}`}>
@@ -265,13 +279,8 @@ function Guild({
           {phase === "guild" && <button className="primary" onClick={() => act({ type: "endGuildPhase" })}>結束公會階段</button>}
           {phase === "adventure" && !state.mission && (
             <>
-              <span className="muted">選一個任務，再選要派遣的冒險者。</span>
-              {must.length > 0 && (
-                <span className="notice">
-                  本回合第一個任務必須派遣 <b>{must.map((u) => ab.faceOf(state, lib, u).name).join("、")}</b>（派遣時自動加入）
-                </span>
-              )}
-              <button className="primary" disabled={!task || !party.length} onClick={dispatch}>派遣</button>
+              <span className="muted">選一個任務後按「出動」，再選擇要派遣的冒險者。</span>
+              <button className="primary" disabled={!task} onClick={() => task && act({ type: "deploy", task })}>出動</button>
               <button onClick={() => act({ type: "endAdventurePhase" })}>結束冒險階段</button>
             </>
           )}
@@ -282,12 +291,12 @@ function Guild({
       <h3>任務</h3>
       <div className="cards">
         {p.staging.map((t) => (
-          <TaskCard key={t} state={state} lib={lib} uid={t} selected={picking && task === t} onClick={picking ? () => setTask(t) : undefined}>
+          <TaskCard key={t} state={state} lib={lib} uid={t} selected={(choosingTask && task === t) || state.mission?.task === t} onClick={choosingTask ? () => setTask(t) : undefined}>
             <span className="muted">暫存格（{p.staging.length}/{stagingSlots(p)}）</span>
           </TaskCard>
         ))}
         {p.formal.map((f) => (
-          <TaskCard key={f.uid} state={state} lib={lib} uid={f.uid} timer={f.timer} selected={picking && task === f.uid} onClick={picking ? () => setTask(f.uid) : undefined} />
+          <TaskCard key={f.uid} state={state} lib={lib} uid={f.uid} timer={f.timer} selected={(choosingTask && task === f.uid) || state.mission?.task === f.uid} onClick={choosingTask ? () => setTask(f.uid) : undefined} />
         ))}
         {!p.staging.length && !p.formal.length && <p className="muted">沒有任務</p>}
       </div>
@@ -295,10 +304,11 @@ function Guild({
       <h3>冒險者</h3>
       <div className="cards">
         {p.adventurers.map((u) => {
-          // 卡片有寫時機的照卡片（公會階段、回合開始時）；其餘在冒險階段、派遣流程以外；加入任務的能力在派遣面板中
+          // 卡片有寫時機的照卡片（公會階段、回合開始時、任務流程的時機窗口）；其餘在冒險階段、派遣流程以外；加入任務的能力在派遣面板中
           const skills = [...activatedSkills(state, lib, u)]
             .filter(([, cs]) => {
               const timing = cs.find((c) => c.code === "TIMING")?.x;
+              if (timing && timing in ab.MISSION_WINDOWS) return phase === "adventure" && state.mission?.stage === ab.MISSION_WINDOWS[timing];
               if (cs.some((c) => c.code === "ADD_PARTICIPANT")) return false;
               if (timing === "公會階段") return phase === "guild";
               if (timing === "回合開始時") return state.turnStartOpen;
@@ -367,9 +377,14 @@ function Guild({
 function ItemUse({ state, lib, uid, act, onUseItem }: { state: GameState; lib: CardLibrary; uid: string; act: Act; onUseItem: (item: string) => void }) {
   const codes = it.itemClauses(state, lib, uid).map((c) => c.code);
   if (!codes.includes("ITEM_CONSUME") && !codes.includes("CONSUME_ALL_TIER_GAIN")) return null;
-  // 道具在冒險階段、派遣流程以外使用；希氏炸藥在擲骰後（在派遣面板中使用）
-  if (codes.includes("ITEM_TOKEN_TIER_RESULT")) return null;
-  if (state.phase !== "adventure" || state.mission) return null;
+  // 寫明任務流程時機的道具在該窗口使用；希氏炸藥在擲骰後（在派遣面板中使用）；其餘在冒險階段、派遣流程以外
+  const timing = it.itemClauses(state, lib, uid).find((c) => c.code === "TIMING")?.x;
+  if (timing && timing in ab.MISSION_WINDOWS) {
+    if (state.phase !== "adventure" || state.mission?.stage !== ab.MISSION_WINDOWS[timing]) return null;
+  } else {
+    if (codes.includes("ITEM_TOKEN_TIER_RESULT")) return null;
+    if (state.phase !== "adventure" || state.mission) return null;
+  }
   const needsTarget = codes.some((c) => c === "EFF_BASE_DICE_ROUND" || c === "EFF_RESET");
   return <button onClick={() => (needsTarget ? onUseItem(uid) : act({ type: "useItem", item: uid }))}>使用</button>;
 }
@@ -423,16 +438,24 @@ function Cleanup({ state, lib, p, act }: { state: GameState; lib: CardLibrary; p
   );
 }
 
+const STEP_LABEL = { select: "2. 派遣", assemble: "3. 建立骰池", pooled: "4. 擲骰", adjust: "5. 確認任務結果" } as const;
+
 function MissionPanel({
   state,
   lib,
   act,
+  party: chosen,
+  must,
+  dispatch,
   onActivate,
   onUseItem,
 }: {
   state: GameState;
   lib: CardLibrary;
   act: Act;
+  party: string[];
+  must: string[];
+  dispatch: () => void;
   onActivate: (card: string, skill: string) => void;
   onUseItem: (item: string) => void;
 }) {
@@ -447,24 +470,34 @@ function MissionPanel({
     [...activatedSkills(state, lib, u)].filter(([, cs]) => cs.some((c) => c.code === "ADD_PARTICIPANT")).map(([s]) => ({ u, s })),
   );
 
+  void onUseItem;
   return (
     <section className="mission">
-      <h2>派遣：「{def.name}」</h2>
-      <p>
-        參與：{party.map((u) => ab.faceOf(state, lib, u).name).join("、")}　薪資 {m.salary} 金
-      </p>
-      {m.stage === "assemble" ? (
+      <h2>
+        {m.stage === "select" ? "出動" : "派遣"}：「{def.name}」　<small className="muted">目前步驟：{STEP_LABEL[m.stage]}</small>
+      </h2>
+      {m.stage === "select" ? (
         <>
-          {party.filter((u) => ab.has(state, lib, u, "PREDICT_PARITY")).map((u) => (
-            <label key={u}>
-              {ab.faceOf(state, lib, u).name} 預言結果值：
-              <select value={predictions[u] ?? ""} onChange={(e) => setPredictions({ ...predictions, [u]: e.target.value as "odd" | "even" })}>
-                <option value="">—</option>
-                <option value="odd">奇數</option>
-                <option value="even">偶數</option>
-              </select>
-            </label>
-          ))}
+          <p className="muted">在下方你的冒險者中，點選要派遣的冒險者（須符合任務規定），再按「派遣」支付薪資。</p>
+          {must.length > 0 && (
+            <p className="notice">
+              本回合第一個任務必須派遣 <b>{must.map((u) => ab.faceOf(state, lib, u).name).join("、")}</b>（派遣時自動加入）
+            </p>
+          )}
+          <p>已選擇：{chosen.length ? chosen.map((u) => ab.faceOf(state, lib, u).name).join("、") : "（尚未選擇）"}　薪資 {chosen.length ? ab.salaryFor(state, lib, chosen).total : 0} 金</p>
+          <div className="row wrap">
+            <button className="primary" disabled={blocked || (!chosen.length && !must.length)} onClick={dispatch}>派遣</button>
+            <button disabled={blocked} onClick={() => act({ type: "cancelDeploy" })}>取消出動</button>
+          </div>
+        </>
+      ) : (
+        <p>
+          參與：{party.map((u) => ab.faceOf(state, lib, u).name).join("、")}　薪資 {m.salary} 金{m.stage !== "assemble" && `　骰池 ${m.pool} 顆`}
+        </p>
+      )}
+      {m.stage === "assemble" && (
+        <>
+          <p className="muted">建立骰池前：可以使用「加入此次任務」等能力，或自選基礎骰數。</p>
           {m.dispatched.flatMap((u) => ab.clauses(state, lib, u, "BASE_DICE_CHOICE").map((c) => (
             <label key={u}>
               {ab.faceOf(state, lib, u).name} 的基礎骰數（{c.x}～{c.y}）：
@@ -477,12 +510,29 @@ function MissionPanel({
                 {ab.faceOf(state, lib, u).name}{s}
               </button>
             ))}
-            <button className="primary" disabled={blocked} onClick={() => act({ type: "roll", predictions, baseDice })}>擲骰</button>
+            <button className="primary" disabled={blocked} onClick={() => act({ type: "buildPool", baseDice })}>建立骰池</button>
           </div>
         </>
-      ) : (
-        <Adjust state={state} lib={lib} act={act} />
       )}
+      {m.stage === "pooled" && (
+        <>
+          <p className="muted">擲骰前：可以使用寫明「擲骰前」的能力或道具，以及擲骰前的宣告。</p>
+          {party.filter((u) => ab.has(state, lib, u, "PREDICT_PARITY")).map((u) => (
+            <label key={u}>
+              {ab.faceOf(state, lib, u).name} 預言結果值：
+              <select value={predictions[u] ?? ""} onChange={(e) => setPredictions({ ...predictions, [u]: e.target.value as "odd" | "even" })}>
+                <option value="">—</option>
+                <option value="odd">奇數</option>
+                <option value="even">偶數</option>
+              </select>
+            </label>
+          ))}
+          <div className="row wrap">
+            <button className="primary" disabled={blocked} onClick={() => act({ type: "roll", predictions })}>擲骰</button>
+          </div>
+        </>
+      )}
+      {m.stage === "adjust" && <Adjust state={state} lib={lib} act={act} />}
     </section>
   );
 }
@@ -557,7 +607,7 @@ function Adjust({ state, lib, act }: { state: GameState; lib: CardLibrary; act: 
           <button key={u} onClick={() => act({ type: "useItem", item: u })}>使用【{state.itemCards[u]!.name}】</button>
         ))}
       </div>
-      <button className="primary" disabled={!!state.pending} onClick={() => act({ type: "resolve" })}>結算</button>
+      <button className="primary" disabled={!!state.pending} onClick={() => act({ type: "resolve" })}>確認任務結果</button>
       <p className="muted">點選骰子可以選取（重擲）或指定要轉動、移除的骰子。</p>
     </>
   );

@@ -148,7 +148,7 @@ export interface UseItemParams {
 
 /**
  * 使用道具：「消耗此道具：……」以及「消耗所有同名道具」（火爪的信念）。
- * 影響骰數的道具只能在派遣的組隊步驟使用；希氏炸藥在擲骰後的調整步驟使用。
+ * 時機：卡片寫明任務流程時機（例如「擲骰前」）的照時機；希氏炸藥在擲骰後；其餘在派遣流程以外。
  */
 export function useItem(state: GameState, lib: CardLibrary, p: PlayerState, a: UseItemParams, log: Log, rng?: Rng): void {
   if (!p.items.includes(a.item)) throw new RuleError("只能使用自己的道具");
@@ -174,7 +174,10 @@ export function useItem(state: GameState, lib: CardLibrary, p: PlayerState, a: U
   // 時機：卡片有寫時機的照卡片（希氏炸藥：本次任務的骰子總和，擲骰後）；
   // 其餘在冒險階段、派遣流程以外使用（派遣 → 建立骰池 → 擲骰 → 結果是連續的動作）
   const tier = codes.includes("ITEM_TOKEN_TIER_RESULT");
-  if (tier) {
+  const timing = clauses.find((c) => c.code === "TIMING")?.x;
+  if (timing && timing in ab.MISSION_WINDOWS) {
+    if (state.phase !== "adventure" || state.mission?.stage !== ab.MISSION_WINDOWS[timing]) throw new RuleError(`${label} 只能在「${timing}」使用`);
+  } else if (tier) {
     if (state.mission?.stage !== "adjust") throw new RuleError(`${label} 只能在擲骰後使用`);
   } else if (state.phase !== "adventure" || state.mission) {
     throw new RuleError(`${label} 只能在冒險階段、派遣流程以外的時候使用`);

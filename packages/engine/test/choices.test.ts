@@ -50,7 +50,7 @@ describe("擲骰前的選擇", () => {
     // 視為 0 骰時，骰池至少 1 顆（alpha1.3）
     const zero = run(s, lib, { type: "roll", baseDice: { [goose!]: 0 } });
     expect(zero.mission!.pool).toBe(1);
-    expect(zero.log.some((l) => l.text.startsWith("骰池不足 1 顆"))).toBe(true);
+    expect(zero.log.some((l) => l.text.startsWith("建立骰池：不足 1 顆"))).toBe(true);
     expect(run(s, lib, { type: "roll" }).mission!.pool).toBe(4);
     expect(() => run(s, lib, { type: "roll", baseDice: { [goose!]: 5 } })).toThrow("0～4");
   });

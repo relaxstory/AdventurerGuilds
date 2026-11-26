@@ -103,7 +103,7 @@ describe("主動能力：代價與效果", () => {
     expect(currentPlayer(s).gold).toBe(gold);
     s = run(s, lib, { type: "roll" });
     expect(s.mission!.pool).toBe(1 + 3);
-    expect(() => run(state, lib, act(reis!, "【空間傳送】", { targets: [john] }))).toThrow("派遣中、擲骰前");
+    expect(() => run(state, lib, act(reis!, "【空間傳送】", { targets: [john] }))).toThrow("派遣後、建立骰池前");
   });
 });
 

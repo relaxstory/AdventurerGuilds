@@ -69,7 +69,12 @@ export interface Mission {
   /** 以其他方式加入、不視為派遣的冒險者（例如瑞斯教授的空間傳送）。 */
   readonly joined: string[];
   readonly salary: number;
-  stage: "assemble" | "adjust";
+  /**
+   * 任務流程的步驟（docs/spec.md 7.1）：
+   * select＝已選擇任務（出動），等待派遣［派遣冒險者前］；assemble＝已派遣，等待建立骰池［建立骰池前］；
+   * pooled＝骰池已建立，等待擲骰［擲骰前］；adjust＝已擲骰，等待確認任務結果［確認任務結果前］。
+   */
+  stage: "select" | "assemble" | "pooled" | "adjust";
   dice: number[];
   /** 骰池建構時的骰數。 */
   pool: number;

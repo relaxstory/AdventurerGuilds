@@ -112,8 +112,10 @@ export function activate(state: GameState, lib: CardLibrary, rng: Rng, p: Player
     if (state.phase !== "guild") throw new RuleError(`${label} 只能在公會階段使用`);
   } else if (timing === "回合開始時") {
     if (!state.turnStartOpen) throw new RuleError(`${label} 只能在回合開始時使用`);
+  } else if (timing && timing in ab.MISSION_WINDOWS) {
+    if (state.phase !== "adventure" || state.mission?.stage !== ab.MISSION_WINDOWS[timing]) throw new RuleError(`${label} 只能在「${timing}」使用`);
   } else if (joining) {
-    if (state.mission?.stage !== "assemble") throw new RuleError(`${label} 只能在派遣中、擲骰前使用（加入此次任務）`);
+    if (state.mission?.stage !== "assemble") throw new RuleError(`${label} 只能在派遣後、建立骰池前使用（加入此次任務）`);
   } else {
     if (state.phase !== "adventure") throw new RuleError(`${label} 只能在冒險階段使用`);
     if (state.mission) throw new RuleError("派遣進行中，不能發動這個能力");

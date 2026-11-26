@@ -7,7 +7,7 @@ import type { CardLibrary, TaskDef } from "./defs.js";
 import { RuleError } from "./errors.js";
 import { scoreGame } from "./honors.js";
 import { Rng } from "./rng.js";
-import { currentPlayer, currentPlayerIndex, type GameState, type PlayerState, type UpgradeBonus, type UpgradePerks, type UpgradeVariant } from "./state.js";
+import { currentPlayer, currentPlayerIndex, type GameState, type Mission, type PlayerState, type UpgradeBonus, type UpgradePerks, type UpgradeVariant } from "./state.js";
 
 export type ExpiryPenalty = "gold" | "reputation";
 
@@ -27,9 +27,15 @@ export type Action =
   /** 試驗方案「牌庫頂」：直接拿任務牌庫最上面的一張。 */
   | { readonly type: "acceptTask"; readonly fromDeck: true }
   | { readonly type: "endGuildPhase" }
-  /** 冒險階段：派遣冒險者執行任務（支付薪資、橫置），進入組隊步驟。 */
-  | { readonly type: "dispatch"; readonly task: string; readonly adventurers: readonly string[] }
-  /** 派遣：隊伍確定，套用擲骰前的選擇，建立骰池並擲骰，進入調整步驟。 */
+  /** 冒險階段 1. 選擇任務步驟：選擇任務並「出動」，之後才選擇冒險者。 */
+  | { readonly type: "deploy"; readonly task: string }
+  /** 出動後、派遣前：取消出動（沒有任何代價）。 */
+  | { readonly type: "cancelDeploy" }
+  /** 2. 派遣步驟：選擇冒險者（須符合任務規定）、支付薪資。沒有出動時可以同時指定任務。 */
+  | { readonly type: "dispatch"; readonly task?: string; readonly adventurers: readonly string[] }
+  /** 3. 建立骰池步驟（自選基礎骰數等）。 */
+  | ({ readonly type: "buildPool" } & ab.RollChoices)
+  /** 4. 擲骰步驟（擲骰前宣告，例如預言）。還沒建立骰池時，會先建立骰池。 */
   | ({ readonly type: "roll" } & ab.RollChoices)
   /** 派遣：使用擲骰後的能力（重擲、轉動、移除、加注、調整結果值）。 */
   | { readonly type: "adjust"; readonly adjustment: ab.Adjustment }
@@ -265,10 +271,33 @@ export function applyAction(prev: GameState, action: Action, lib: CardLibrary): 
       state.phase = "adventure";
       break;
 
-    case "dispatch": {
+    case "deploy": {
       need("adventure", "冒險階段");
       if (state.mission) throw new RuleError("還有進行中的派遣");
-      startMission(state, lib, p, action.task, action.adventurers, log);
+      checkTask(state, lib, p, action.task);
+      state.mission = newMission(action.task, [], 0, "select");
+      log(`出動：選擇任務「${taskDef(state, lib, action.task).name}」`);
+      break;
+    }
+
+    case "cancelDeploy": {
+      const m = requireMission(state, "select");
+      log(`取消出動「${taskDef(state, lib, m.task).name}」`);
+      state.mission = null;
+      break;
+    }
+
+    case "dispatch": {
+      need("adventure", "冒險階段");
+      let task = action.task;
+      if (state.mission) {
+        if (state.mission.stage !== "select") throw new RuleError("還有進行中的派遣");
+        if (task !== undefined && task !== state.mission.task) throw new RuleError("請派遣冒險者執行已出動的任務，或先取消出動");
+        task = state.mission.task;
+        state.mission = null;
+      }
+      if (task === undefined) throw new RuleError("請先選擇任務並出動");
+      startMission(state, lib, p, task, action.adventurers, log);
       // 送錯的軍令：派遣 [迅捷] 冒險者時直接完成，不擲骰
       const m = state.mission!;
       if (ab.completesDirectly(state, lib, m)) {
@@ -280,18 +309,21 @@ export function applyAction(prev: GameState, action: Action, lib: CardLibrary): 
       break;
     }
 
-    case "roll": {
+    case "buildPool": {
       const m = requireMission(state, "assemble");
-      // 擲骰前加入的冒險者使任務直接完成時（例如用「加入此次任務」加入的丹妮絲），不擲骰
-      if (ab.completesDirectly(state, lib, m)) {
-        ab.onParticipate(state, lib, p, m, log);
-        m.stage = "adjust";
-        m.autoSuccess = true;
-        resolveMission(state, lib, p, m, log);
-        break;
+      buildPool(state, lib, p, m, action, log);
+      break;
+    }
+
+    case "roll": {
+      const m = state.mission;
+      if (m?.stage === "assemble") {
+        buildPool(state, lib, p, m, action, log);
+        if (!state.mission) break; // 直接完成
       }
-      ab.applyRollChoices(state, lib, m, action);
-      rollMission(state, lib, rng, p, m, log);
+      const pooled = requireMission(state, "pooled");
+      ab.applyRollChoices(state, lib, pooled, action, "roll");
+      rollMission(state, lib, rng, p, pooled, log);
       break;
     }
 
@@ -373,21 +405,60 @@ export function applyAction(prev: GameState, action: Action, lib: CardLibrary): 
 
 // ── 冒險階段：派遣（docs/spec.md 7.1）──
 
-function requireMission(state: GameState, stage: "assemble" | "adjust") {
+const STAGE_ERROR: Record<Mission["stage"], string> = {
+  select: "請先選擇任務並出動",
+  assemble: "請在派遣後、建立骰池前進行",
+  pooled: "請先建立骰池",
+  adjust: "還沒有擲骰",
+};
+
+function requireMission(state: GameState, stage: Mission["stage"]) {
   const m = state.mission;
   if (state.phase !== "adventure" || !m) throw new RuleError("目前沒有進行中的派遣");
-  if (m.stage !== stage) throw new RuleError(stage === "assemble" ? "已經擲過骰了" : "還沒有擲骰");
+  if (m.stage !== stage) throw new RuleError(STAGE_ERROR[stage]);
   return m;
 }
 
-/** 選任務、選冒險者、支付薪資、橫置。 */
-function startMission(state: GameState, lib: CardLibrary, p: PlayerState, taskUid: string, party: readonly string[], log: (text: string) => void): void {
+function newMission(task: string, party: readonly string[], salary: number, stage: Mission["stage"]): Mission {
+  return {
+    task, dispatched: [...party], joined: [], salary, stage, dice: [], pool: 0, removedBy: {},
+    predictions: {}, baseDice: {}, used: {}, turned: {}, resultDelta: 0, resultTimes: 1, autoSuccess: false, gamble: null,
+  };
+}
+
+/** 1. 選擇任務步驟：檢查任務可以執行。 */
+function checkTask(state: GameState, lib: CardLibrary, p: PlayerState, taskUid: string): void {
   const inStaging = p.staging.includes(taskUid);
   const inFormal = p.formal.some((f) => f.uid === taskUid);
   if (!inStaging && !inFormal) throw new RuleError("只能執行自己暫存格或正式任務區的任務");
   const def = taskDef(state, lib, taskUid);
   if (!def.condition) throw new RuleError(`任務「${def.name}」沒有任務目標，無法執行`);
   if (def.type === "史詩" && state.epicTried.includes(taskUid)) throw new RuleError("史詩任務只能嘗試一次");
+}
+
+/** 3. 建立骰池步驟：參與的冒險者確定（觸發參與時的效果）、自選基礎骰數、建立骰池。直接完成的任務不建立骰池。 */
+function buildPool(state: GameState, lib: CardLibrary, p: PlayerState, m: Mission, choices: ab.RollChoices, log: (text: string, dice?: number[]) => void): void {
+  // 直接完成（例如用「加入此次任務」加入的丹妮絲）：不擲骰
+  if (ab.completesDirectly(state, lib, m)) {
+    ab.onParticipate(state, lib, p, m, log);
+    m.stage = "adjust";
+    m.autoSuccess = true;
+    resolveMission(state, lib, p, m, log);
+    return;
+  }
+  ab.applyRollChoices(state, lib, m, choices, "pool");
+  const def = taskDef(state, lib, m.task);
+  ab.onParticipate(state, lib, p, m, log);
+  const pool = ab.dicePool(state, lib, m, def);
+  m.pool = Math.max(RULES.minDicePool, pool); // 骰池至少 1 顆
+  log(pool < m.pool ? `建立骰池：不足 ${RULES.minDicePool} 顆，改為 ${m.pool} 顆` : `建立骰池：${m.pool} 顆`);
+  m.stage = "pooled";
+}
+
+/** 2. 派遣步驟：選冒險者（須符合任務規定）、支付薪資、橫置。 */
+function startMission(state: GameState, lib: CardLibrary, p: PlayerState, taskUid: string, party: readonly string[], log: (text: string) => void): void {
+  checkTask(state, lib, p, taskUid);
+  const def = taskDef(state, lib, taskUid);
   if (party.length === 0) throw new RuleError("至少要派遣 1 名冒險者");
   if (new Set(party).size !== party.length) throw new RuleError("同一名冒險者不能重複派遣");
   for (const uid of party) {
@@ -414,20 +485,15 @@ function startMission(state: GameState, lib: CardLibrary, p: PlayerState, taskUi
   p.missionsThisTurn += 1;
   const names = party.map((uid) => adventurerFace(state, lib, uid).name).join("、");
   log(`派遣 ${names} 執行「${def.name}」，支付薪資 ${salary} 金`);
-  state.mission = {
-    task: taskUid, dispatched: [...party], joined: [], salary, stage: "assemble", dice: [], pool: 0, removedBy: {},
-    predictions: {}, baseDice: {}, used: {}, turned: {}, resultDelta: 0, resultTimes: 1, autoSuccess: false, gamble: null,
-  };
+  state.mission = newMission(taskUid, party, salary, "assemble");
 }
 
-/** 隊伍確定：參與時的效果、建立骰池、擲骰、擲骰後的強制效果。 */
+/** 4. 擲骰步驟：依骰池擲骰，套用擲骰後的強制效果。 */
 function rollMission(state: GameState, lib: CardLibrary, rng: Rng, p: PlayerState, m: NonNullable<GameState["mission"]>, log: (text: string, dice?: number[]) => void): void {
+  void p;
   const def = taskDef(state, lib, m.task);
-  ab.onParticipate(state, lib, p, m, log);
-  const pool = ab.dicePool(state, lib, m, def);
-  m.pool = Math.max(RULES.minDicePool, pool); // 骰池至少 1 顆
   m.dice = rng.rollDice(m.pool);
-  log(pool < m.pool ? `骰池不足 ${RULES.minDicePool} 顆，改擲 ${m.pool} 顆骰子` : `擲 ${m.pool} 顆骰子`, [...m.dice]);
+  log(`擲 ${m.pool} 顆骰子`, [...m.dice]);
   ab.afterRollMandatory(state, lib, m, def, log);
   m.stage = "adjust";
 }

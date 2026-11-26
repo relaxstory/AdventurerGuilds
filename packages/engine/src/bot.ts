@@ -114,7 +114,9 @@ function missionStep(state: GameState, lib: CardLibrary): Action {
   const m = state.mission!;
   const def = taskDef(state, lib, m.task);
   const op = def.condition!.op;
-  if (m.stage === "assemble") {
+  // AI 不使用「出動後才選冒險者」的流程；萬一停在這一步就取消出動
+  if (m.stage === "select") return { type: "cancelDeploy" };
+  if (m.stage === "assemble" || m.stage === "pooled") {
     const predictions: Record<string, "odd" | "even"> = {};
     const baseDice: Record<string, number> = {};
     for (const uid of participants(m)) {

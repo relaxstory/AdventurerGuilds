@@ -150,3 +150,48 @@ describe("奧【恢復術】（alpha1.4）", () => {
     expect(s.pending).toMatchObject({ kind: "confirmRescue", target: valeno });
   });
 });
+
+describe("任務流程的步驟與時機窗口（alpha1.4）", () => {
+  it("出動 → 派遣 → 建立骰池 → 擲骰 → 確認任務結果；出動後可以取消", () => {
+    const state = game();
+    const [leon, riley] = hire(state, "STD-C21", "STD-C13");
+    const t = take(state, "STD-M21");
+    let s = run(state, lib, { type: "deploy", task: t });
+    expect(s.mission).toMatchObject({ stage: "select", dispatched: [] });
+    expect(run(s, lib, { type: "cancelDeploy" }).mission).toBeNull();
+    expect(() => run(s, lib, { type: "roll" })).toThrow();
+    s = run(s, lib, { type: "dispatch", adventurers: [leon!, riley!] });
+    expect(s.mission).toMatchObject({ stage: "assemble", task: t });
+    s = run(s, lib, { type: "buildPool" });
+    expect(s.mission).toMatchObject({ stage: "pooled", pool: 2 });
+    expect(s.mission!.dice).toEqual([]);
+    s = run(s, lib, { type: "roll" });
+    expect(s.mission!.stage).toBe("adjust");
+    expect(s.mission!.dice).toHaveLength(2);
+  });
+
+  it("寫明時機的能力只能在對應的窗口使用（派遣冒險者前／建立骰池前／擲骰前／確認任務結果前）", async () => {
+    const { MISSION_WINDOWS } = await import("../src/abilities.js");
+    expect(MISSION_WINDOWS).toMatchObject({ 派遣冒險者前: "select", 建立骰池前: "assemble", 擲骰前: "pooled", 確認任務結果前: "adjust", 擲骰完畢後: "adjust" });
+  });
+});
+
+describe("時機窗口的實際判定", () => {
+  it("寫「擲骰前」的能力：出動前、派遣後都不能用，建立骰池後可以用", () => {
+    const timed = { ...src, clauses: [...src.clauses, { cardId: "STD-C42", cardName: "艾里克", order: "2", skillName: "【晨間禱告】", clause: "0", code: "TIMING", x: "擲骰前", y: "", z: "" }] };
+    const tlib = new CardLibrary(timed, true);
+    const state = createGame(config({ includeTest: true }), timed);
+    state.phase = "adventure";
+    state.turnStartOpen = false;
+    const [eric, leon] = hire(state, "STD-C42", "STD-C21");
+    const t = take(state, "STD-M21");
+    const pray = { type: "activate" as const, card: eric!, skill: "【晨間禱告】" };
+    expect(() => run(state, tlib, pray)).toThrow("只能在「擲骰前」使用");
+    let s = run(state, tlib, { type: "dispatch", task: t, adventurers: [leon!] });
+    expect(() => run(s, tlib, pray)).toThrow("只能在「擲骰前」使用");
+    s = run(s, tlib, { type: "buildPool" });
+    const rep = currentPlayer(s).reputation;
+    s = run(s, tlib, pray);
+    expect(currentPlayer(s).reputation).toBe(rep + 1);
+  });
+});

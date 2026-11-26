@@ -647,19 +647,22 @@ export interface RollChoices {
   readonly baseDice?: Readonly<Record<string, number>>;
 }
 
-/** 套用擲骰前的選擇，並檢查必要的選擇是否都已提供。 */
-export function applyRollChoices(state: GameState, lib: CardLibrary, m: Mission, choices: RollChoices): void {
+/**
+ * 套用擲骰前的選擇，並檢查必要的選擇是否都已提供。
+ * part＝pool：建立骰池步驟（自選基礎骰數）；part＝roll：擲骰步驟（預言）。
+ */
+export function applyRollChoices(state: GameState, lib: CardLibrary, m: Mission, choices: RollChoices, part: "pool" | "roll"): void {
   const party = participants(m);
   for (const uid of party) {
     const name = faceOf(state, lib, uid).name;
-    if (has(state, lib, uid, "PREDICT_PARITY")) {
+    if (part === "roll" && has(state, lib, uid, "PREDICT_PARITY")) {
       const p = choices.predictions?.[uid];
       if (p !== "odd" && p !== "even") throw new RuleError(`${name} 需要在擲骰前預言結果值為奇數或偶數`);
       m.predictions[uid] = p;
     }
     // 金牙古斯【你跑不掉的】：「派遣此冒險者……時」，用「加入此次任務」加入時不能自選
     const range = m.dispatched.includes(uid) ? clauses(state, lib, uid, "BASE_DICE_CHOICE")[0] : undefined;
-    const chosen = choices.baseDice?.[uid];
+    const chosen = part === "pool" ? choices.baseDice?.[uid] : undefined;
     if (chosen !== undefined) {
       if (!range) throw new RuleError(`${name} 不能自選基礎骰數`);
       const lo = amount(state, lib, uid, range.x);
@@ -869,6 +872,18 @@ export function recordPermanentParticipation(state: GameState, lib: CardLibrary,
   const all = participants(m).flatMap((u) => members(state, u));
   card.permanentUsed = { turn: playerTurnKey(state), adventurers: [...new Set([...permanentUsed(state, m.task), ...all])] };
 }
+
+/**
+ * 任務流程的時機窗口（docs/spec.md 7.1）：卡片的時機寫法 → 可以使用的步驟。
+ * 「擲骰完畢後」視同「確認任務結果前」。
+ */
+export const MISSION_WINDOWS: Record<string, Mission["stage"]> = {
+  派遣冒險者前: "select",
+  建立骰池前: "assemble",
+  擲骰前: "pooled",
+  確認任務結果前: "adjust",
+  擲骰完畢後: "adjust",
+};
 
 /** 派遣的冒險者（含小隊成員）是否有某個特質。 */
 const partyHasTrait = (state: GameState, lib: CardLibrary, party: readonly string[], trait: string) =>
