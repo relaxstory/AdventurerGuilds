@@ -106,7 +106,7 @@ export function activate(state: GameState, lib: CardLibrary, rng: Rng, p: Player
   const effects = clauses.filter((c) => EFFECTS.has(c.code));
   const joining = effects.some((c) => c.code === "ADD_PARTICIPANT");
 
-  // 時機：卡片有寫時機的照卡片；其餘在冒險階段、派遣流程以外使用（docs/spec.md 13A）
+  // 時機：卡片有寫時機的照卡片；其餘在自己回合的冒險階段，任何可插入的時機（含任務流程的時機窗口）（docs/spec.md 13A）
   const timing = clauses.find((c) => c.code === "TIMING")?.x;
   if (timing === "公會階段") {
     if (state.phase !== "guild") throw new RuleError(`${label} 只能在公會階段使用`);
