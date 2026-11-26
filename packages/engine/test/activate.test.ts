@@ -31,6 +31,36 @@ describe("主動能力：代價與效果", () => {
     expect(() => run(state, lib, act(eric!, "【晨間禱告】"))).not.toThrow();
   });
 
+  it("沒有寫時機的主動能力，在任務流程的每個時機窗口都能使用（啟動時機窗口定案）", () => {
+    const { state, lib } = adventure();
+    const [eric, leon] = hire(state, "STD-C42", "STD-C21");
+    const t = take(state, "STD-M04");
+    const select = run(state, lib, { type: "deploy", task: t });
+    expect(select.mission!.stage).toBe("select");
+    expect(currentPlayer(run(select, lib, act(eric!, "【晨間禱告】"))).reputation).toBe(1);
+    const assemble = run(state, lib, { type: "dispatch", task: t, adventurers: [leon!] });
+    expect(assemble.mission!.stage).toBe("assemble");
+    expect(currentPlayer(run(assemble, lib, act(eric!, "【晨間禱告】"))).reputation).toBe(1);
+    const pooled = run(assemble, lib, { type: "buildPool" });
+    expect(pooled.mission!.stage).toBe("pooled");
+    expect(currentPlayer(run(pooled, lib, act(eric!, "【晨間禱告】"))).reputation).toBe(1);
+    const adjust = run(pooled, lib, { type: "roll" });
+    expect(adjust.mission!.stage).toBe("adjust");
+    expect(currentPlayer(run(adjust, lib, act(eric!, "【晨間禱告】"))).reputation).toBe(1);
+  });
+
+  it("任務中被巴爾送走的參與者也離開任務，不提供骰子", () => {
+    const { state, lib } = adventure();
+    const [baal, leon, kafi] = hire(state, "STD-C03", "STD-C21", "STD-C55");
+    const t = take(state, "STD-M04");
+    let s = run(state, lib, { type: "dispatch", task: t, adventurers: [leon!, kafi!] });
+    s = run(s, lib, act(baal!, "【我敬你一杯！】", { targets: [kafi], tavernIndex: 0 }));
+    expect(s.mission!.dispatched).toEqual([leon]);
+    expect(s.adventurerDiscard).toContain(kafi);
+    s = run(s, lib, { type: "buildPool" });
+    expect(s.mission!.pool).toBe(1);
+  });
+
   it("艾妲【今晚唱些老故事吧】：任務完成區每有 1 項任務，獲得 2 金", () => {
     const { state, lib } = adventure();
     const [ada] = hire(state, "STD-C36");

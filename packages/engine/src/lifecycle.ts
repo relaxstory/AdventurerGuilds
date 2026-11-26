@@ -96,6 +96,7 @@ export function finalizeDestroy(state: GameState, lib: CardLibrary, uid: string,
     return;
   }
   owner.adventurers = owner.adventurers.filter((u) => u !== uid);
+  ab.leaveMission(state, uid);
   if (card.derivative) {
     delete state.adventurerCards[uid]; // 衍生物回到衍生物牌組
     log(`${name} 被銷毀，回到衍生物牌組`);

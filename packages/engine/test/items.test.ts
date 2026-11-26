@@ -116,13 +116,14 @@ describe("製作與轉換", () => {
 });
 
 describe("使用道具", () => {
-  it("強壯藥劑：在冒險階段、派遣流程以外使用，本輪基礎骰數 +2；派遣流程中不能使用", () => {
+  it("強壯藥劑：沒寫時機，冒險階段任何時機都能使用（含建立骰池前），本輪基礎骰數 +2", () => {
     const { state, lib } = adventure();
     const [leon] = hire(state, "STD-C21");
     const [potion] = give(state, lib, "伊蓮娜的強壯藥劑");
     const t = take(state, "STD-M04");
     const inMission = run(state, lib, { type: "dispatch", task: t, adventurers: [leon!] });
-    expect(() => run(inMission, lib, { type: "useItem", item: potion!, targets: [leon!] })).toThrow("派遣流程以外");
+    const drunk = run(inMission, lib, { type: "useItem", item: potion!, targets: [leon!] }, { type: "buildPool" });
+    expect(drunk.mission!.pool).toBe(1 + 2);
     const guild = structuredClone(state);
     guild.phase = "guild";
     expect(() => run(guild, lib, { type: "useItem", item: potion!, targets: [leon!] })).toThrow("冒險階段");
@@ -145,7 +146,7 @@ describe("使用道具", () => {
     expect(s.adventurerCards[foe!]!.tapped).toBe(true);
   });
 
-  it("道具只能在冒險階段、派遣流程以外使用（希氏炸藥除外）", () => {
+  it("沒寫時機的道具只能在冒險階段使用", () => {
     const { state, lib } = adventure();
     const [leon] = hire(state, "STD-C21");
     const [potion] = give(state, lib, "伊蓮娜的精力藥劑");

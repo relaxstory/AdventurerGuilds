@@ -449,6 +449,16 @@ export function salaryFor(state: GameState, lib: CardLibrary, party: readonly st
 
 export const participants = (m: Mission) => [...m.dispatched, ...m.joined];
 
+/** 冒險者離開公會（被銷毀、放入棄置區等）時，也離開進行中的任務。 */
+export function leaveMission(state: GameState, uid: string): void {
+  const m = state.mission;
+  if (!m) return;
+  for (const list of [m.dispatched, m.joined]) {
+    const i = list.indexOf(uid);
+    if (i >= 0) list.splice(i, 1);
+  }
+}
+
 /** 參與任務時觸發（隊伍確定、擲骰前）。 */
 export function onParticipate(state: GameState, lib: CardLibrary, p: PlayerState, m: Mission, log: Log): void {
   const party = participants(m);

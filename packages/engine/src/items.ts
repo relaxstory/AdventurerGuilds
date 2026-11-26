@@ -179,8 +179,9 @@ export function useItem(state: GameState, lib: CardLibrary, p: PlayerState, a: U
     if (state.phase !== "adventure" || state.mission?.stage !== ab.MISSION_WINDOWS[timing]) throw new RuleError(`${label} 只能在「${timing}」使用`);
   } else if (tier) {
     if (state.mission?.stage !== "adjust") throw new RuleError(`${label} 只能在擲骰後使用`);
-  } else if (state.phase !== "adventure" || state.mission) {
-    throw new RuleError(`${label} 只能在冒險階段、派遣流程以外的時候使用`);
+  } else if (state.phase !== "adventure") {
+    // 沒寫時機：冒險階段中凡是可以插入的時機都能使用，包括任務流程的時機窗口
+    throw new RuleError(`${label} 只能在冒險階段使用`);
   }
 
   const needsTarget = codes.some((c) => c === "EFF_BASE_DICE_ROUND" || c === "EFF_RESET");

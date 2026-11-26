@@ -304,7 +304,7 @@ function Guild({
       <h3>冒險者</h3>
       <div className="cards">
         {p.adventurers.map((u) => {
-          // 卡片有寫時機的照卡片（公會階段、回合開始時、任務流程的時機窗口）；其餘在冒險階段、派遣流程以外；加入任務的能力在派遣面板中
+          // 卡片有寫時機的照卡片（公會階段、回合開始時、任務流程的時機窗口）；沒寫時機的在冒險階段任何可插入的時機（含任務流程的時機窗口）；加入任務的能力在派遣面板中
           const skills = [...activatedSkills(state, lib, u)]
             .filter(([, cs]) => {
               const timing = cs.find((c) => c.code === "TIMING")?.x;
@@ -312,7 +312,7 @@ function Guild({
               if (cs.some((c) => c.code === "ADD_PARTICIPANT")) return false;
               if (timing === "公會階段") return phase === "guild";
               if (timing === "回合開始時") return state.turnStartOpen;
-              return phase === "adventure" && !state.mission;
+              return phase === "adventure";
             })
             .map(([s]) => s);
           const chosen = party.includes(u);
@@ -385,7 +385,7 @@ function ItemUse({ state, lib, uid, act, onUseItem }: { state: GameState; lib: C
     if (state.phase !== "adventure" || state.mission?.stage !== ab.MISSION_WINDOWS[timing]) return null;
   } else {
     if (codes.includes("ITEM_TOKEN_TIER_RESULT")) return null;
-    if (state.phase !== "adventure" || state.mission) return null;
+    if (state.phase !== "adventure") return null;
   }
   const needsTarget = codes.some((c) => c === "EFF_BASE_DICE_ROUND" || c === "EFF_RESET");
   return <button onClick={() => (needsTarget ? onUseItem(uid) : act({ type: "useItem", item: uid }))}>使用</button>;

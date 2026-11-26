@@ -117,8 +117,8 @@ export function activate(state: GameState, lib: CardLibrary, rng: Rng, p: Player
   } else if (joining) {
     if (state.mission?.stage !== "assemble") throw new RuleError(`${label} 只能在派遣後、建立骰池前使用（加入此次任務）`);
   } else {
+    // 沒寫時機：冒險階段中凡是可以插入的時機都能使用，包括任務流程的時機窗口（可能對骰子或任務結果沒有影響）
     if (state.phase !== "adventure") throw new RuleError(`${label} 只能在冒險階段使用`);
-    if (state.mission) throw new RuleError("派遣進行中，不能發動這個能力");
   }
 
   // 代價：冒號前面的部分必須付得出來
@@ -230,6 +230,7 @@ function planEffects(
         plan.push(() => {
           const recruit = state.tavern[i]!;
           p.adventurers = p.adventurers.filter((u) => u !== out);
+          ab.leaveMission(state, out!);
           const card = state.adventurerCards[out!]!;
           card.tapped = false;
           for (const u of ab.members(state, out!)) state.adventurerCards[u]!.tokens = {}; // 進入棄置區時移除指示物
