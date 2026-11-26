@@ -668,7 +668,7 @@
 
 #### 「維塔莉黛特之手」奧
 
-- 【恢復術】當有其他非衍生物冒險者將被銷毀時，橫置此冒險者：改為橫置該冒險者。（英文：If another non-token adventurer would be destroyed, you may tap this adventurer. If you do, tap that adventurer instead.）
+- 【恢復術】當有其他非衍生物冒險者將被銷毀時，橫置此冒險者：改為橫置該冒險者(不會被銷毀)。（英文：If another non-token adventurer would be destroyed, you may tap this adventurer. If you do, tap that adventurer instead.）
 - 【維塔莉黛特的恩賜】當你使用【恢復術】時，若目標為自己公會的冒險者，重置該冒險者；若為其他公會的冒險者，提升2聲望。
 
 | 項目 | 規則 |
